@@ -43,7 +43,10 @@
         <a href="#delivery">Доставка</a>
         <a href="#faq">FAQ</a>
       </nav>
-      <a class="header-cta" href="https://t.me/seabluushop" target="_blank" rel="noopener">Telegram</a>
+      <div class="header-actions">
+        <button class="header-cta header-cta--ghost" type="button" data-open-login>Войти</button>
+        <a class="header-cta" href="https://t.me/seabluushop" target="_blank" rel="noopener">Telegram</a>
+      </div>
     </header>
 
     <main id="top">
@@ -469,6 +472,32 @@
         <a href="https://www.webtap.kz/" target="_blank" rel="noopener">Сайт создан WebTap — разработка лендингов и сайтов</a>
       </div>
     </footer>
+
+    <dialog class="login-modal" data-login-modal aria-labelledby="login-title">
+      <div class="login-modal__head">
+        <h2 id="login-title">Вход в личный кабинет</h2>
+        <button type="button" aria-label="Закрыть" data-close-login>×</button>
+      </div>
+      <div class="login-modal__body">
+        <p class="login-modal__hint">Личный кабинет клиента скоро появится — там можно будет отслеживать заказы без Telegram-бота.</p>
+        <form data-login-form novalidate>
+          <label class="login-field">
+            <span>Телефон или e-mail</span>
+            <input type="text" name="login" autocomplete="username" placeholder="+7 700 000 00 00" />
+          </label>
+          <label class="login-field">
+            <span>Пароль</span>
+            <input type="password" name="password" autocomplete="current-password" placeholder="••••••••" />
+          </label>
+          <div class="login-modal__notice" data-login-notice role="status" aria-live="polite">
+            <span>😅</span>
+            <p>Упс! Данная функция ещё в разработке</p>
+          </div>
+          <button class="btn btn--primary login-modal__submit" type="submit">Войти</button>
+        </form>
+        <a class="login-modal__admin-link" href="/admin/login">Нажмите для входа в админ-панель</a>
+      </div>
+    </dialog>
 
     <dialog class="offer-modal" data-offer-modal aria-labelledby="offer-title">
       <div class="offer-modal__head">

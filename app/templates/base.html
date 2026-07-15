@@ -54,9 +54,23 @@
             font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--sb-bg);
             color: var(--sb-ink);
+            position: relative;
         }
 
-        .font-mono, .mono-num { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
+        /* Мягкое амбиентное свечение фона — как в современных дашбордах */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(720px 480px at 88% -8%, rgba(0,180,216,0.10), transparent 60%),
+                radial-gradient(640px 420px at -8% 92%, rgba(0,119,182,0.09), transparent 60%);
+        }
+        body > div { position: relative; z-index: 1; }
+
+        .font-mono, .mono-num { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
 
         [x-cloak] { display: none !important; }
 
@@ -156,8 +170,14 @@
         .sb-nav-link:hover { color: var(--sb-ink); background: rgba(255,255,255,0.04); }
         .sb-nav-link.active { color: var(--sb-accent); background: var(--sb-accent-wash); border-color: rgba(0,180,216,0.25); }
         .sb-nav-link i { width: 1.1rem; text-align: center; flex-shrink: 0; }
-        .sidebar-collapsed .sb-nav-link span, .sidebar-collapsed .sb-label { display: none; }
-        .sidebar-collapsed .sb-sidebar-inner { width: 4.5rem !important; }
+        /* Схлопывание — только на десктопе; на мобильном (выезжающее меню
+           поверх контента) состояние из localStorage не должно ужимать его
+           до нечитаемой узкой полоски. */
+        @media (min-width: 1024px) {
+            .sidebar-collapsed .sb-nav-link span, .sidebar-collapsed .sb-label { display: none; }
+            .sidebar-collapsed .sb-sidebar-inner { width: 4.5rem !important; }
+            .sidebar-collapsed .sb-nav-link { justify-content: center; }
+        }
 
         /* ---- Topbar ----------------------------------------------------- */
         .sb-topbar { background: var(--sb-bg-elevated); border-bottom: 1px solid var(--sb-border); }
@@ -173,11 +193,40 @@
         }
 
         /* ---- Stat cards --------------------------------------------------- */
-        .stat-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-        .stat-icon {
-            width: 2.75rem; height: 2.75rem; border-radius: 0.9rem;
-            display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+        .stat-card {
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+            position: relative; overflow: hidden;
+            transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
         }
+        .stat-card::after {
+            content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+            background: radial-gradient(120px 90px at 100% 0%, var(--stat-glow, transparent), transparent 70%);
+            opacity: 0; transition: opacity 250ms ease;
+        }
+        .stat-card:hover { transform: translateY(-3px); border-color: var(--sb-border-strong); }
+        .stat-card:hover::after { opacity: 1; }
+        .stat-icon {
+            width: 3.25rem; height: 3.25rem; border-radius: 1rem;
+            display: flex; align-items: center; justify-content: center; font-size: 1.35rem; flex-shrink: 0;
+            transition: transform 250ms cubic-bezier(.34,1.56,.64,1);
+        }
+        .stat-card:hover .stat-icon { transform: scale(1.08) rotate(-4deg); }
+        .stat-value { font-size: 1.85rem; line-height: 1.15; }
+        @media (min-width: 1024px) { .stat-value { font-size: 2.1rem; } }
+
+        /* ---- Nav active indicator ------------------------------------- */
+        .sb-nav-link { position: relative; }
+        .sb-nav-link.active::before {
+            content: ''; position: absolute; left: -0.75rem; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 1.35rem; border-radius: 3px;
+            background: var(--sb-accent); box-shadow: 0 0 10px 1px var(--sb-accent);
+        }
+        .sb-nav-link i { font-size: 0.95rem; }
+        .sb-nav-link.active i { text-shadow: 0 0 12px var(--sb-accent-wash); }
+
+        /* ---- Micro-interactions --------------------------------------- */
+        .btn-primary:active, .btn-ghost:active, .btn-accent-green:active, .btn-accent-red:active { transform: scale(0.97); }
+        a, button { -webkit-tap-highlight-color: transparent; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -209,8 +258,8 @@
             <div class="sb-sidebar-inner sb-sidebar flex flex-col h-full w-72 transition-[width] duration-200">
 
                 <!-- Logo -->
-                <div class="flex items-center justify-between px-5 py-5 border-b" style="border-color: var(--sb-border);">
-                    <a href="/admin/" class="flex items-center space-x-2.5 min-w-0">
+                <div class="flex items-center border-b" :class="sidebarCollapsed ? 'flex-col gap-2 px-0 py-4' : 'justify-between px-5 py-5'" style="border-color: var(--sb-border);">
+                    <a href="/admin/" class="flex items-center space-x-2.5 min-w-0" :class="{ 'justify-center': sidebarCollapsed }">
                         <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                              style="background: linear-gradient(135deg, var(--sb-accent-strong), var(--sb-accent));">
                             <i class="fas fa-water text-white text-xs"></i>
@@ -318,9 +367,7 @@
                         <span class="sb-kbd hidden md:inline">⌘K</span>
                     </div>
 
-                    <div class="flex-1 sm:hidden"></div>
-
-                    <div class="flex items-center gap-2 lg:gap-3">
+                    <div class="flex items-center gap-2 lg:gap-3 ml-auto">
                         {% block topbar_actions %}{% endblock %}
 
                         <button class="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/5 transition-colors" style="color: var(--sb-ink-soft);" title="Уведомления">
@@ -375,6 +422,31 @@
     </div>
 
     <script>
+        // Плавный count-up для чисел в stat-карточках. Хранит последнее
+        // отрисованное значение на самом элементе, чтобы при повторных вызовах
+        // (например после обновления фильтров) анимация шла от текущего числа,
+        // а не каждый раз от нуля.
+        window.countUp = function (el, target, duration = 700) {
+            target = Number(target) || 0;
+            const from = Number(el.dataset.countFrom || 0);
+            if (from === target) { el.textContent = target.toLocaleString('ru-RU'); return; }
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                el.textContent = target.toLocaleString('ru-RU');
+                el.dataset.countFrom = target;
+                return;
+            }
+            const start = performance.now();
+            const step = (now) => {
+                const p = Math.min((now - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - p, 3);
+                const value = Math.round(from + (target - from) * eased);
+                el.textContent = value.toLocaleString('ru-RU');
+                if (p < 1) requestAnimationFrame(step);
+                else el.dataset.countFrom = target;
+            };
+            requestAnimationFrame(step);
+        };
+
         // Единый тост для всех страниц админки. Раньше на части страниц вызов
         // шёл через `Alpine.$data.pageUtils.showNotification(...)` — но
         // Alpine.$data это функция, а не объект с полем pageUtils, так что

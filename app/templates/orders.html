@@ -29,32 +29,32 @@
 
     <!-- Stat cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <div class="glass-effect rounded-2xl p-4 lg:p-5 stat-card">
+        <div class="glass-effect rounded-2xl p-5 lg:p-6 stat-card" style="--stat-glow: rgba(0,180,216,0.35);">
             <div>
-                <p class="text-xs font-medium mb-1.5" style="color: var(--sb-ink-faint);">Всего заказов</p>
-                <p class="text-2xl font-extrabold mono-num" style="color: var(--sb-ink);" x-text="stats.total_orders.toLocaleString('ru-RU')"></p>
+                <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--sb-ink-faint);">Всего заказов</p>
+                <p class="stat-value font-extrabold mono-num" style="color: var(--sb-ink);" x-effect="window.countUp($el, stats.total_orders)">0</p>
             </div>
             <div class="stat-icon" style="background: var(--sb-accent-wash); color: var(--sb-accent);"><i class="fas fa-box"></i></div>
         </div>
-        <div class="glass-effect rounded-2xl p-4 lg:p-5 stat-card">
+        <div class="glass-effect rounded-2xl p-5 lg:p-6 stat-card" style="--stat-glow: rgba(52,211,153,0.35);">
             <div>
-                <p class="text-xs font-medium mb-1.5" style="color: var(--sb-ink-faint);">Активные</p>
-                <p class="text-2xl font-extrabold mono-num" style="color: var(--sb-ink);" x-text="stats.active_orders.toLocaleString('ru-RU')"></p>
+                <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--sb-ink-faint);">Активные</p>
+                <p class="stat-value font-extrabold mono-num" style="color: var(--sb-ink);" x-effect="window.countUp($el, stats.active_orders)">0</p>
             </div>
             <div class="stat-icon" style="background: rgba(52,211,153,0.14); color: var(--sb-success);"><i class="fas fa-hourglass-half"></i></div>
         </div>
-        <div class="glass-effect rounded-2xl p-4 lg:p-5 stat-card">
+        <div class="glass-effect rounded-2xl p-5 lg:p-6 stat-card" style="--stat-glow: rgba(0,180,216,0.35);">
             <div>
-                <p class="text-xs font-medium mb-1.5" style="color: var(--sb-ink-faint);">Выполнено</p>
-                <p class="text-2xl font-extrabold mono-num" style="color: var(--sb-ink);" x-text="stats.completed_orders.toLocaleString('ru-RU')"></p>
+                <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--sb-ink-faint);">Выполнено</p>
+                <p class="stat-value font-extrabold mono-num" style="color: var(--sb-ink);" x-effect="window.countUp($el, stats.completed_orders)">0</p>
             </div>
             <div class="stat-icon" style="background: rgba(0,180,216,0.14); color: var(--sb-accent);"><i class="fas fa-check-circle"></i></div>
         </div>
-        <div class="glass-effect rounded-2xl p-4 lg:p-5 stat-card">
+        <div class="glass-effect rounded-2xl p-5 lg:p-6 stat-card" style="--stat-glow: rgba(248,113,113,0.35);">
             <div>
-                <p class="text-xs font-medium mb-1.5" style="color: var(--sb-ink-faint);">Требуют действий</p>
-                <p class="text-2xl font-extrabold mono-num" style="color: var(--sb-ink);" x-text="stats.needs_attention.toLocaleString('ru-RU')"></p>
-                <p class="text-[11px] mt-0.5" style="color: var(--sb-ink-faint);">не оплачено участниками</p>
+                <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--sb-ink-faint);">Требуют действий</p>
+                <p class="stat-value font-extrabold mono-num" style="color: var(--sb-ink);" x-effect="window.countUp($el, stats.needs_attention)">0</p>
+                <p class="text-[11px] mt-1" style="color: var(--sb-ink-faint);">не оплачено участниками</p>
             </div>
             <div class="stat-icon" style="background: rgba(248,113,113,0.14); color: var(--sb-danger);"><i class="fas fa-exclamation-triangle"></i></div>
         </div>

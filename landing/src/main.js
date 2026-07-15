@@ -3,6 +3,11 @@ const nav = document.querySelector("[data-nav]");
 const modal = document.querySelector("[data-offer-modal]");
 const openOfferButtons = document.querySelectorAll("[data-open-offer]");
 const closeOffer = document.querySelector("[data-close-offer]");
+const loginModal = document.querySelector("[data-login-modal]");
+const openLoginButtons = document.querySelectorAll("[data-open-login]");
+const closeLogin = document.querySelector("[data-close-login]");
+const loginForm = document.querySelector("[data-login-form]");
+const loginNotice = document.querySelector("[data-login-notice]");
 const faqItems = document.querySelectorAll(".faq-list details");
 const buttons = document.querySelectorAll(".btn, .header-cta, .menu-toggle, .footer-link");
 const sectionLinks = [...document.querySelectorAll('.main-nav a[href^="#"]')];
@@ -57,6 +62,42 @@ modal?.addEventListener("click", (event) => {
 
 modal?.addEventListener("close", () => {
   document.documentElement.classList.remove("modal-open");
+});
+
+const openLoginModal = () => {
+  if (loginModal instanceof HTMLDialogElement) {
+    loginNotice?.classList.remove("is-visible");
+    loginForm?.reset();
+    loginModal.showModal();
+    document.documentElement.classList.add("modal-open");
+  }
+};
+
+const closeLoginModal = () => {
+  if (loginModal instanceof HTMLDialogElement) {
+    loginModal.close();
+  }
+};
+
+openLoginButtons.forEach((button) => {
+  button.addEventListener("click", openLoginModal);
+});
+
+closeLogin?.addEventListener("click", closeLoginModal);
+
+loginModal?.addEventListener("click", (event) => {
+  if (event.target === loginModal && loginModal instanceof HTMLDialogElement) {
+    closeLoginModal();
+  }
+});
+
+loginModal?.addEventListener("close", () => {
+  document.documentElement.classList.remove("modal-open");
+});
+
+loginForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loginNotice?.classList.add("is-visible");
 });
 
 faqItems.forEach((item) => {
