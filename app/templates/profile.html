@@ -150,11 +150,7 @@ async function uploadAvatar(file) {
 }
 
 function showNotification(message, type) {
-    if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-        Alpine.$data.pageUtils.showNotification(message, type);
-    } else {
-        alert(message);
-    }
+    window.showToast(message, type);
 }
 
 document.addEventListener('alpine:init', () => {
@@ -195,11 +191,7 @@ document.addEventListener('alpine:init', () => {
         },
         
         showNotification(message, type) {
-            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                Alpine.$data.pageUtils.showNotification(message, type);
-            } else {
-                alert(message);
-            }
+            window.showToast(message, type);
         }
     }));
     
@@ -242,11 +234,7 @@ document.addEventListener('alpine:init', () => {
         },
         
         showNotification(message, type) {
-            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                Alpine.$data.pageUtils.showNotification(message, type);
-            } else {
-                alert(message);
-            }
+            window.showToast(message, type);
         }
     }));
 });

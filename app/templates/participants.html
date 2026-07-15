@@ -472,11 +472,7 @@
             },
 
             showNotification(message, type = 'info') {
-                if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                    Alpine.$data.pageUtils.showNotification(message, type);
-                } else {
-                    alert(message);
-                }
+                window.showToast(message, type);
             }
         }));
     });

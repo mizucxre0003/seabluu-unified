@@ -5,18 +5,14 @@
 {% block content %}
 <div x-data="adminUsers()" class="space-y-4 lg:space-y-6">
     <!-- Header -->
-    <div class="glass-effect rounded-2xl p-4 lg:p-6">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
-            <div>
-                <h1 class="text-lg lg:text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                    Администраторы
-                </h1>
-                <p class="text-gray-400 mt-1 text-sm lg:text-base">Управление доступом к панели администратора</p>
-            </div>
-            <a href="/admin/admin-users/new" class="btn-primary px-4 py-3 rounded-2xl font-medium text-sm lg:text-base text-center" data-touch-target>
-                <i class="fas fa-plus mr-2"></i>Добавить администратора
-            </a>
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-extrabold" style="color: var(--sb-ink);">Администраторы</h1>
+            <p class="text-sm mt-1" style="color: var(--sb-ink-faint);">Управление доступом к панели администратора</p>
         </div>
+        <a href="/admin/admin-users/new" class="btn-primary self-start lg:self-auto inline-flex items-center gap-2 px-4 h-10 text-sm font-semibold" data-touch-target>
+            <i class="fas fa-plus text-xs"></i>Добавить администратора
+        </a>
     </div>
 
     <!-- Admin Users List -->
@@ -53,7 +49,7 @@
                             <img :src="user.avatar_url" :alt="user.username" class="w-10 h-10 rounded-full">
                         </template>
                         <template x-if="!user.avatar_url">
-                            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <div class="avatar-gradient">
                                 <i class="fas fa-user text-white text-sm"></i>
                             </div>
                         </template>
@@ -67,8 +63,7 @@
                     <div class="space-y-2 text-sm mb-3">
                         <div class="flex justify-between">
                             <span class="text-gray-400">Роль:</span>
-                            <span x-text="getRoleDisplayName(user.role_name || user.role)" 
-                                  :class="(user.role_name || user.role) === 'Супер-администратор' ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : (user.role_name || user.role) === 'admin' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : (user.role_name || user.role) === 'manager' ? 'bg-gradient-to-r from-green-500 to-teal-500' : 'bg-gradient-to-r from-gray-500 to-gray-600'"
+                            <span x-text="user.role_name || 'Не назначена'" :class="roleBadgeClass(user.role_name)"
                                   class="px-2 py-1 rounded-full text-xs font-medium text-white"></span>
                         </div>
                         <div class="flex justify-between">
@@ -142,7 +137,7 @@
                                             <img :src="user.avatar_url" :alt="user.username" class="w-10 h-10 rounded-full">
                                         </template>
                                         <template x-if="!user.avatar_url">
-                                            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                            <div class="avatar-gradient">
                                                 <i class="fas fa-user text-white"></i>
                                             </div>
                                         </template>
@@ -153,8 +148,7 @@
                                     </div>
                                 </td>
                                 <td class="py-4 px-4">
-                                    <span x-text="getRoleDisplayName(user.role_name || user.role)" 
-                                          :class="(user.role_name || user.role) === 'Супер-администратор' ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : (user.role_name || user.role) === 'admin' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : (user.role_name || user.role) === 'manager' ? 'bg-gradient-to-r from-green-500 to-teal-500' : 'bg-gradient-to-r from-gray-500 to-gray-600'"
+                                    <span x-text="user.role_name || 'Не назначена'" :class="roleBadgeClass(user.role_name)"
                                           class="px-3 py-1 rounded-full text-xs font-medium text-white"></span>
                                 </td>
                                 <td class="py-4 px-4">
@@ -230,16 +224,16 @@ document.addEventListener('alpine:init', () => {
             }
         },
         
-        getRoleDisplayName(roleName) {
-            const roleNames = {
-                'Супер-администратор': 'Супер-админ',
-                'admin': 'Администратор',
-                'manager': 'Менеджер',
-                'viewer': 'Наблюдатель'
+        roleBadgeClass(roleName) {
+            const classes = {
+                'Супер-администратор': 'bg-gradient-to-r from-amber-500 to-orange-500',
+                'Администратор': 'bg-gradient-to-r from-blue-500 to-cyan-500',
+                'Менеджер': 'bg-gradient-to-r from-emerald-500 to-teal-500',
+                'Наблюдатель': 'bg-gradient-to-r from-slate-500 to-slate-600'
             };
-            return roleNames[roleName] || roleName;
+            return classes[roleName] || 'bg-gradient-to-r from-slate-500 to-slate-600';
         },
-        
+
         formatDate(dateString) {
             if (!dateString) return 'Никогда';
             try {
@@ -256,11 +250,7 @@ document.addEventListener('alpine:init', () => {
         },
         
         showNotification(message, type = 'info') {
-            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                Alpine.$data.pageUtils.showNotification(message, type);
-            } else {
-                alert(message);
-            }
+            window.showToast(message, type);
         }
     }));
 });

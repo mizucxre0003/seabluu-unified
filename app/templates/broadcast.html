@@ -115,15 +115,11 @@ document.addEventListener('alpine:init', () => {
                 const data = await response.json();
                 this.result = data.result;
                 
-                if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                    Alpine.$data.pageUtils.showNotification('Рассылка отправлена успешно', 'success');
-                }
-                
+                window.showToast('Рассылка отправлена успешно', 'success');
+
             } catch (error) {
                 console.error('Error sending broadcast:', error);
-                if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                    Alpine.$data.pageUtils.showNotification('Ошибка при отправке рассылки: ' + error.message, 'error');
-                }
+                window.showToast('Ошибка при отправке рассылки: ' + error.message, 'error');
             } finally {
                 this.loading = false;
             }

@@ -169,9 +169,7 @@ document.addEventListener('alpine:init', () => {
         
         showError(message) {
             console.error('Dashboard error:', message);
-            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
-                Alpine.$data.pageUtils.showNotification(message, 'error');
-            }
+            window.showToast(message, 'error');
         }
     }));
 });

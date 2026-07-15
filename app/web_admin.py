@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import List, Optional
 from datetime import datetime, timedelta
+from pydantic import ValidationError
 import json
 import io
 
@@ -373,29 +374,36 @@ async def create_admin_user(request: Request, current_admin: dict = Depends(get_
         check_permission(current_admin, "admin_users.create")
         data = await request.json()
 
-        # Преобразуем название роли в ID если нужно
-        if 'role' in data and 'role_id' not in data:
-            from app.services.role_service import RoleService
-            role = await RoleService.get_role_by_name(data['role'])
-            if role:
-                data['role_id'] = role['id']
+        # Роль (в т.ч. супер-админа) может назначить только супер-админ.
+        # У остальных, даже с правом admin_users.create, новый админ всегда
+        # получает роль по умолчанию (см. AdminService.create_user).
+        role_id = None
+        if check_super_admin(current_admin):
+            role_id = data.get('role_id')
+            if role_id is None and data.get('role'):
+                role = await RoleService.get_role_by_name(data['role'])
+                if role:
+                    role_id = role['id']
 
-        # Назначать конкретную роль (в т.ч. супер-админа) может только супер-админ.
-        # Остальные роли с правом admin_users.create создают пользователя с ролью по умолчанию.
-        if not check_super_admin(current_admin):
-            data.pop('role_id', None)
-            data.pop('role', None)
+        # Собираем модель только из ожидаемых полей — формы на фронте иногда
+        # присылают лишнее (id, is_active и т.п.), а модель это не разрешает.
+        try:
+            user_data = AdminUserCreate(
+                username=data.get('username'),
+                email=data.get('email'),
+                password=data.get('password'),
+                role_id=role_id,
+            )
+        except ValidationError as e:
+            raise HTTPException(400, f"Некорректные данные: {e}")
 
-        user_data = AdminUserCreate(**data)
-        
-        # Проверяем существование пользователя
         existing = await AdminService.get_user_by_username(user_data.username)
         if existing:
             raise HTTPException(400, "Пользователь с таким именем уже существует")
-        
+
         user = await AdminService.create_user(user_data)
         return {"success": True, "user": user, "message": "Администратор создан"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -409,20 +417,40 @@ async def update_admin_user(user_id: int, request: Request, current_admin: dict 
         check_permission(current_admin, "admin_users.edit")
         data = await request.json()
 
-        # Менять роль другого пользователя (в т.ч. выдавать/снимать супер-админа)
-        # может только супер-админ. Остальные поля (email, пароль, активность,
-        # аватар) правятся любым, у кого есть admin_users.edit.
-        if not check_super_admin(current_admin):
-            data.pop('role_id', None)
+        update_fields = {}
+        if data.get('email') is not None:
+            update_fields['email'] = data['email']
+        if data.get('avatar_url') is not None:
+            update_fields['avatar_url'] = data['avatar_url']
+        if data.get('is_active') is not None:
+            update_fields['is_active'] = data['is_active']
+        # Пароль трогаем, только если реально прислали непустую строку —
+        # иначе пустое поле в форме молча стирало бы текущий пароль.
+        if data.get('password'):
+            update_fields['password'] = data['password']
 
-        user_data = AdminUserUpdate(**data)
+        # Роль другого пользователя (в т.ч. выдать/снять супер-админа) может
+        # менять только супер-админ.
+        if check_super_admin(current_admin):
+            role_id = data.get('role_id')
+            if role_id is None and data.get('role'):
+                role = await RoleService.get_role_by_name(data['role'])
+                if role:
+                    role_id = role['id']
+            if role_id is not None:
+                update_fields['role_id'] = role_id
+
+        try:
+            user_data = AdminUserUpdate(**update_fields)
+        except ValidationError as e:
+            raise HTTPException(400, f"Некорректные данные: {e}")
 
         user = await AdminService.update_user(user_id, user_data)
         if not user:
             raise HTTPException(404, "Пользователь не найден")
-        
+
         return {"success": True, "user": user, "message": "Администратор обновлен"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -646,33 +674,44 @@ async def delete_role(role_id: int, request: Request, current_admin: dict = Depe
 
 @app.get("/api/stats")
 async def get_stats(current_admin: dict = Depends(get_current_admin)):
-    """Оптимизированное получение статистики для дашборда"""
+    """Статистика для дашборда и шапки списка заказов"""
+    final_status = STATUSES[-1]  # "✅ получен заказчиком"
     try:
-        # Используем один SQL запрос для получения всей статистики
         async with db.pool.acquire() as conn:
-            # Получаем общее количество заказов
             total_orders = await conn.fetchval("SELECT COUNT(*) FROM orders") or 0
-            
-            # Получаем количество уникальных участников одним запросом
+
+            completed_orders = await conn.fetchval(
+                "SELECT COUNT(*) FROM orders WHERE status = $1", final_status
+            ) or 0
+
+            # "Требуют действий" — заказы, где есть хотя бы один неоплативший
+            # участник. Реальная, уже существующая колонка (participants.paid),
+            # никаких изменений в схеме БД для этого не нужно.
+            needs_attention = await conn.fetchval(
+                "SELECT COUNT(DISTINCT order_id) FROM participants WHERE paid = FALSE"
+            ) or 0
+
             unique_participants = await conn.fetchval(
                 "SELECT COUNT(DISTINCT username) FROM participants"
             ) or 0
-            
-            # Получаем количество подписок
+
             total_subscriptions = await conn.fetchval("SELECT COUNT(*) FROM subscriptions") or 0
-        
+
         return {
             "total_orders": total_orders,
-            "active_orders": total_orders,  # Упрощенная логика - все заказы считаются активными
+            "active_orders": max(total_orders - completed_orders, 0),
+            "completed_orders": completed_orders,
+            "needs_attention": needs_attention,
             "total_participants": unique_participants,
             "total_subscriptions": total_subscriptions
         }
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
-        # Возвращаем базовые значения в случае ошибки
         return {
             "total_orders": 0,
             "active_orders": 0,
+            "completed_orders": 0,
+            "needs_attention": 0,
             "total_participants": 0,
             "total_subscriptions": 0
         }
