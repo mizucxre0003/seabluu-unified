@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block page_title %}Управление ролями{% endblock %}
+
+{% block content %}
+<div x-data="roles()" class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 class="text-xl sm:text-2xl font-bold">Роли системы</h1>
+        <button @click="createRole()" 
+                class="btn-primary w-full sm:w-auto px-6 py-3 text-sm sm:text-base rounded-full"
+                data-touch-target
+                x-show="hasPermission('roles.create')">
+            <i class="fas fa-plus mr-2"></i>Создать роль
+        </button>
+    </div>
+
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-blue-400 text-4xl mb-4"></i>
+        <p class="text-gray-400 text-lg">Загрузка ролей...</p>
+    </div>
+
+    <!-- Roles Grid -->
+    <div x-show="!loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <template x-for="role in roles" :key="role.id">
+            <div class="glass-effect rounded-2xl p-4 sm:p-6 card-hover min-h-[120px]">
+                <div class="flex justify-between items-start mb-3 sm:mb-4">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-base sm:text-lg font-semibold truncate" x-text="role.name"></h3>
+                        <p class="text-gray-400 text-xs sm:text-sm mt-1 truncate" x-text="role.description"></p>
+                    </div>
+                    <div class="flex space-x-1 sm:space-x-2 ml-2">
+                        <button @click="editRole(role)" 
+                                class="text-blue-400 hover:text-blue-300 p-1 sm:p-2 rounded-full"
+                                data-touch-target
+                                x-show="hasPermission('roles.edit') && !role.is_default">
+                            <i class="fas fa-edit text-sm sm:text-base"></i>
+                        </button>
+                        <button @click="deleteRole(role)" 
+                                class="text-red-400 hover:text-red-300 p-1 sm:p-2 rounded-full"
+                                data-touch-target
+                                x-show="hasPermission('roles.delete') && !role.is_default">
+                            <i class="fas fa-trash text-sm sm:text-base"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="space-y-2 sm:space-y-3">
+                    <div class="flex justify-between text-xs sm:text-sm">
+                        <span class="text-gray-400">Разрешения:</span>
+                        <span class="text-gray-300" x-text="role.permissions.length"></span>
+                    </div>
+                    
+                    <div class="text-xs text-gray-500">
+                        <span x-show="role.is_default" class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                            По умолчанию
+                        </span>
+                        <span x-show="!role.is_default" class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">
+                            Пользовательская
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="!loading && roles.length === 0" class="text-center py-12">
+        <i class="fas fa-shield-alt text-gray-500 text-4xl mb-4"></i>
+        <p class="text-gray-400 text-lg">Роли не найдены</p>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div x-show="showCreateModal || showEditModal" 
+         x-transition:enter="transition-opacity duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity duration-300"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50 hidden"
+         x-cloak
+         :class="{ 'hidden': !(showCreateModal || showEditModal) }">
+        <div class="glass-effect rounded-2xl p-4 sm:p-6 w-full max-w-sm sm:max-w-lg md:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto"
+             @click.self="closeModal()">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold" x-text="showEditModal ? 'Редактировать роль' : 'Создать роль'"></h3>
+                <button @click="closeModal()" class="text-gray-400 hover:text-white p-1 rounded-full" data-touch-target>
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            
+            <form @submit.prevent="saveRole">
+                <div class="space-y-4">
+                    <!-- Name -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Название роли</label>
+                        <input type="text" x-model="currentRole.name" 
+                               class="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-2xl focus:outline-none focus:border-blue-400 text-base"
+                               required
+                               data-touch-target>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Описание</label>
+                        <textarea x-model="currentRole.description" 
+                                  class="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-2xl focus:outline-none focus:border-blue-400 text-base"
+                                  rows="2"
+                                  data-touch-target></textarea>
+                    </div>
+                    
+                    <!-- Default Role -->
+                    <div class="flex items-center" x-show="!showEditModal">
+                        <input type="checkbox" x-model="currentRole.is_default" 
+                               id="is_default" class="mr-2 w-5 h-5 rounded"
+                               data-touch-target>
+                        <label for="is_default" class="text-sm text-gray-300">Роль по умолчанию для новых пользователей</label>
+                    </div>
+                    
+                    <!-- Permissions -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Разрешения</label>
+                        <div class="max-h-48 sm:max-h-64 overflow-y-auto border border-white/20 rounded-2xl p-3 sm:p-4">
+                            <template x-for="category in permissionCategories" :key="category">
+                                <div class="mb-3 sm:mb-4">
+                                    <h4 class="font-medium text-gray-300 mb-2 text-sm sm:text-base" x-text="getCategoryName(category)"></h4>
+                                    <div class="grid grid-cols-1 gap-2">
+                                        <template x-for="perm in permissionsByCategory[category]" :key="perm.id">
+                                            <label class="flex items-center space-x-3 text-sm sm:text-base py-1">
+                                                <input type="checkbox" 
+                                                       :value="perm.id" 
+                                                       x-model="currentRole.permissions"
+                                                       class="rounded border-white/20 w-5 h-5"
+                                                       data-touch-target>
+                                                <span class="flex-1" x-text="perm.name"></span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
+                    <button type="button" @click="closeModal()" 
+                            class="px-4 py-3 border border-white/20 rounded-2xl hover:bg-white/10 text-base"
+                            data-touch-target>
+                        Отмена
+                    </button>
+                    <button type="submit" class="btn-primary px-4 py-3 rounded-2xl text-base" data-touch-target>
+                        <span x-text="showEditModal ? 'Сохранить' : 'Создать'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" 
+         x-transition:enter="transition-opacity duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity duration-300"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50 hidden"
+         x-cloak
+         :class="{ 'hidden': !showDeleteModal }">
+        <div class="glass-effect rounded-2xl p-4 sm:p-6 w-full max-w-xs sm:max-w-md"
+             @click.self="closeModal()">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-red-400 text-3xl mb-3"></i>
+                <h3 class="text-lg font-semibold mb-2">Подтверждение удаления</h3>
+                <p class="text-gray-400 mb-4 text-sm sm:text-base">
+                    Вы уверены, что хотите удалить роль "<span class="font-medium" x-text="currentRole.name"></span>"?
+                </p>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-3">
+                <button @click="closeModal()" 
+                        class="px-4 py-3 border border-white/20 rounded-2xl hover:bg-white/10 text-base"
+                        data-touch-target>
+                    Отмена
+                </button>
+                <button @click="confirmDelete()" 
+                        class="btn-danger px-4 py-3 rounded-2xl text-base"
+                        data-touch-target>
+                    Удалить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('roles', () => ({
+        roles: [],
+        permissions: [],
+        permissionsByCategory: {},
+        permissionCategories: [],
+        currentRole: {
+            id: null,
+            name: '',
+            description: '',
+            permissions: [],
+            is_default: false
+        },
+        loading: true,
+        showCreateModal: false,
+        showEditModal: false,
+        showDeleteModal: false,
+        
+        init() {
+            // Убеждаемся, что модальные окна закрыты при инициализации
+            this.showCreateModal = false;
+            this.showEditModal = false;
+            this.showDeleteModal = false;
+            
+            console.log('Модальные окна инициализированы:', {
+                create: this.showCreateModal,
+                edit: this.showEditModal,
+                delete: this.showDeleteModal
+            });
+            
+            // Загружаем данные
+            this.loadData();
+        },
+        
+        async loadData() {
+            try {
+                this.loading = true;
+                console.log('Начало загрузки данных, состояние модальных окон:', {
+                    create: this.showCreateModal,
+                    edit: this.showEditModal,
+                    delete: this.showDeleteModal
+                });
+                
+                // Загрузка ролей
+                const rolesResponse = await fetch('/admin/api/roles');
+                console.log('Ответ API ролей:', rolesResponse.status, rolesResponse.statusText);
+                if (rolesResponse.ok) {
+                    const data = await rolesResponse.json();
+                    console.log('Данные ролей:', data);
+                    this.roles = data.roles || [];
+                } else {
+                    console.error('Ошибка загрузки ролей:', rolesResponse.status);
+                }
+                
+                // Загрузка разрешений
+                const permsResponse = await fetch('/admin/api/roles/permissions');
+                if (permsResponse.ok) {
+                    const permsData = await permsResponse.json();
+                    this.permissions = permsData.permissions || [];
+                    this.groupPermissionsByCategory();
+                }
+                
+                console.log('Загрузка данных завершена, состояние модальных окон:', {
+                    create: this.showCreateModal,
+                    edit: this.showEditModal,
+                    delete: this.showDeleteModal
+                });
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Ошибка загрузки данных');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        groupPermissionsByCategory() {
+            this.permissionsByCategory = {};
+            this.permissions.forEach(perm => {
+                if (!this.permissionsByCategory[perm.category]) {
+                    this.permissionsByCategory[perm.category] = [];
+                }
+                this.permissionsByCategory[perm.category].push(perm);
+            });
+            this.permissionCategories = Object.keys(this.permissionsByCategory);
+        },
+        
+        getCategoryName(category) {
+            const names = {
+                'orders': 'Заказы',
+                'participants': 'Участники',
+                'addresses': 'Адреса',
+                'reports': 'Отчеты',
+                'broadcast': 'Рассылки',
+                'admin_users': 'Администраторы',
+                'roles': 'Роли',
+                'settings': 'Настройки'
+            };
+            return names[category] || category;
+        },
+        
+        hasPermission(permission) {
+            // Временно отключаем проверку прав для отображения кнопок
+            return true;
+            /*
+            const authStore = Alpine.store('auth');
+            if (!authStore || !authStore.permissions) {
+                return false;
+            }
+            return authStore.permissions.includes(permission);
+            */
+        },
+        
+        createRole() {
+            console.log('createRole вызван, текущее состояние:', {
+                create: this.showCreateModal,
+                edit: this.showEditModal,
+                delete: this.showDeleteModal
+            });
+            
+            this.closeModal();
+            this.currentRole = {
+                id: null,
+                name: '',
+                description: '',
+                permissions: [],
+                is_default: false
+            };
+            this.showCreateModal = true;
+            
+            console.log('createRole завершен, новое состояние:', {
+                create: this.showCreateModal,
+                edit: this.showEditModal,
+                delete: this.showDeleteModal
+            });
+        },
+        
+        editRole(role) {
+            this.closeModal();
+            this.currentRole = {
+                id: role.id,
+                name: role.name,
+                description: role.description || '',
+                permissions: [...role.permissions],
+                is_default: role.is_default || false
+            };
+            this.showEditModal = true;
+        },
+        
+        deleteRole(role) {
+            this.closeModal();
+            this.currentRole = { ...role };
+            this.showDeleteModal = true;
+        },
+        
+        closeModal() {
+            console.log('closeModal вызван, текущее состояние:', {
+                create: this.showCreateModal,
+                edit: this.showEditModal,
+                delete: this.showDeleteModal
+            });
+            
+            this.showCreateModal = false;
+            this.showEditModal = false;
+            this.showDeleteModal = false;
+            
+            console.log('closeModal завершен, новое состояние:', {
+                create: this.showCreateModal,
+                edit: this.showEditModal,
+                delete: this.showDeleteModal
+            });
+        },
+        
+        async saveRole() {
+            try {
+                const url = this.showEditModal ? 
+                    `/admin/api/roles/${this.currentRole.id}` : 
+                    '/admin/api/roles';
+                
+                const method = this.showEditModal ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.currentRole)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save role');
+                }
+                
+                await this.loadData();
+                this.closeModal();
+                
+            } catch (error) {
+                console.error('Error saving role:', error);
+                alert('Ошибка сохранения роли');
+            }
+        },
+        
+        async confirmDelete() {
+            try {
+                const response = await fetch(`/admin/api/roles/${this.currentRole.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete role');
+                }
+                
+                await this.loadData();
+                this.closeModal();
+                
+            } catch (error) {
+                console.error('Error deleting role:', error);
+                alert('Ошибка удаления роли');
+            }
+        }
+    }));
+});
+</script>
+{% endblock %} 

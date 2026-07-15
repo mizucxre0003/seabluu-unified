@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block page_title %}{% if order %}Редактирование заказа {{ order.order_id }}{% else %}Создание заказа{% endif %}{% endblock %}
+
+{% block content %}
+<div x-data="orderForm()" class="max-w-2xl mx-auto">
+    <div class="glass-effect rounded-2xl p-6">
+        <form @submit.prevent="submitForm()" class="space-y-6">
+            <!-- Order Number and Country -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Номер заказа *</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <input type="text" x-model="formData.order_number" required
+                               class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                               placeholder="12345">
+                        <p class="text-xs text-gray-400 mt-1">Только цифры</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Страна *</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="flex items-center p-3 rounded-2xl border border-white/10 hover:border-blue-500/50 cursor-pointer transition-all duration-200"
+                                   :class="formData.country === 'CN' ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5'">
+                                <input type="radio" x-model="formData.country" value="CN" class="hidden" required>
+                                <div class="flex items-center space-x-2 w-full justify-center">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                                         :class="formData.country === 'CN' ? 'border-blue-400 bg-blue-400' : 'border-gray-400'">
+                                        <i class="fas fa-check text-white text-xs" x-show="formData.country === 'CN'"></i>
+                                    </div>
+                                    <span class="text-sm">CN</span>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center p-3 rounded-2xl border border-white/10 hover:border-blue-500/50 cursor-pointer transition-all duration-200"
+                                   :class="formData.country === 'KR' ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5'">
+                                <input type="radio" x-model="formData.country" value="KR" class="hidden" required>
+                                <div class="flex items-center space-x-2 w-full justify-center">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                                         :class="formData.country === 'KR' ? 'border-blue-400 bg-blue-400' : 'border-gray-400'">
+                                        <i class="fas fa-check text-white text-xs" x-show="formData.country === 'KR'"></i>
+                                    </div>
+                                    <span class="text-sm">KR</span>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center p-3 rounded-2xl border border-white/10 hover:border-blue-500/50 cursor-pointer transition-all duration-200"
+                                   :class="formData.country === 'JP' ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/5'">
+                                <input type="radio" x-model="formData.country" value="JP" class="hidden" required>
+                                <div class="flex items-center space-x-2 w-full justify-center">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                                         :class="formData.country === 'JP' ? 'border-blue-400 bg-blue-400' : 'border-gray-400'">
+                                        <i class="fas fa-check text-white text-xs" x-show="formData.country === 'JP'"></i>
+                                    </div>
+                                    <span class="text-sm">JP</span>
+                                </div>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 text-center">Китай | Корея | Япония</p>
+                    </div>
+                </div>
+                <div class="mt-2 p-3 bg-white/5 rounded-2xl">
+                    <p class="text-sm text-gray-400">
+                        <span class="font-semibold">Будет создан заказ:</span> 
+                        <span x-text="formData.order_number && formData.country ? formData.country + '-' + formData.order_number.replace(/\D/g, '') : '...'" class="font-mono text-blue-400"></span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Client Name -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Клиент *</label>
+                <textarea x-model="formData.client_name" required rows="2"
+                          class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                          placeholder="Имя клиента или @username..."></textarea>
+                <p class="text-xs text-gray-400 mt-1">Можно указать несколько @username через запятую</p>
+            </div>
+
+            <!-- Status -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Статус *</label>
+                <select x-model="formData.status" required
+                        class="styled-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200">
+                    <option value="">Выберите статус...</option>
+                    {% for status in statuses %}
+                    <option value="{{ status }}">{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Admin Label -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Метка Админа</label>
+                <textarea x-model="formData.note" rows="2"
+                          class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                          placeholder="Смайлик или слово для идентификации заказа админом..."></textarea>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-6 border-t border-white/10">
+                <a href="/admin/orders" class="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200">
+                    Отмена
+                </a>
+                <button type="submit" :disabled="loading"
+                        class="btn-primary px-8 py-3 rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
+                    <i class="fas fa-spinner fa-spin mr-2" x-show="loading"></i>
+                    {% if order %}Обновить заказ{% else %}Создать заказ{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success Message -->
+    <div x-show="success" x-transition class="fixed top-4 right-4 glass-effect rounded-2xl p-4 border border-green-500/20">
+        <div class="flex items-center space-x-3 text-green-400">
+            <i class="fas fa-check-circle"></i>
+            <span x-text="successMessage"></span>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div x-show="error" x-transition class="fixed top-4 right-4 glass-effect rounded-2xl p-4 border border-red-500/20">
+        <div class="flex items-center space-x-3 text-red-400">
+            <i class="fas fa-exclamation-circle"></i>
+            <span x-text="errorMessage"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('orderForm', () => ({
+        loading: false,
+        success: false,
+        error: false,
+        successMessage: '',
+        errorMessage: '',
+        formData: {
+            order_number: '',
+            client_name: '',
+            country: 'CN',
+            status: '',
+            note: ''
+        },
+        
+        init() {
+            // Если редактирование, загружаем данные заказа
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('edit');
+            if (orderId) {
+                this.loadOrder(orderId);
+            }
+        },
+        
+        async loadOrder(orderId) {
+            try {
+                const response = await fetch(`/admin/api/orders/${orderId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data.order) {
+                    // Извлекаем номер из order_id (убираем префикс)
+                    const orderNumber = data.order.order_id.replace(/^(CN|KR|JP)-/, '');
+                    
+                    this.formData = {
+                        order_number: orderNumber,
+                        client_name: data.order.client_name,
+                        country: data.order.country,
+                        status: data.order.status,
+                        note: data.order.note || ''
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading order:', error);
+                this.showError('Ошибка загрузки заказа');
+            }
+        },
+        
+        async submitForm() {
+            this.loading = true;
+            this.hideMessages();
+            
+            try {
+                // Проверяем обязательные поля
+                if (!this.formData.order_number || !this.formData.client_name || !this.formData.country || !this.formData.status) {
+                    this.showError('Заполните все обязательные поля');
+                    this.loading = false;
+                    return;
+                }
+                
+                // Очищаем номер от лишних символов, оставляем только цифры
+                const cleanNumber = this.formData.order_number.replace(/\D/g, '');
+                if (!cleanNumber) {
+                    this.showError('Номер заказа должен содержать цифры');
+                    this.loading = false;
+                    return;
+                }
+                
+                // Автоматически создаем order_id с префиксом
+                const orderId = `${this.formData.country}-${cleanNumber}`;
+                
+                // Создаем данные для отправки
+                const submitData = {
+                    order_id: orderId,
+                    client_name: this.formData.client_name,
+                    country: this.formData.country,
+                    status: this.formData.status,
+                    note: this.formData.note || ''
+                };
+                
+                const url = '/admin/api/orders/create';
+                const method = 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(submitData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    this.showSuccess(data.message || `Заказ ${orderId} успешно создан`);
+                    setTimeout(() => {
+                        window.location.href = '/admin/orders';
+                    }, 2000);
+                } else {
+                    this.showError(data.detail || 'Ошибка при создании заказа');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                this.showError('Ошибка соединения с сервером');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        showSuccess(message) {
+            this.successMessage = message;
+            this.success = true;
+            setTimeout(() => this.hideMessages(), 5000);
+        },
+        
+        showError(message) {
+            this.errorMessage = message;
+            this.error = true;
+            setTimeout(() => this.hideMessages(), 5000);
+        },
+        
+        hideMessages() {
+            this.success = false;
+            this.error = false;
+        }
+    }));
+});
+</script>
+{% endblock %}

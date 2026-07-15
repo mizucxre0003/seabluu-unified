@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block page_title %}Мой профиль{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <!-- Profile Info -->
+    <div class="glass-effect rounded-2xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Информация профиля</h3>
+        
+        <div class="flex items-center space-x-6 mb-6">
+            <div class="relative">
+                <img id="avatar-preview" 
+                     src="{{ current_admin.avatar_url or 'https://ui-avatars.com/api/?name=' + current_admin.username + '&background=random&size=128' }}" 
+                     alt="{{ current_admin.username }}" 
+                     class="w-20 h-20 rounded-2xl">
+                <input type="file" id="avatar-input" accept="image/*" class="hidden">
+                <button onclick="document.getElementById('avatar-input').click()" 
+                        class="absolute -bottom-2 -right-2 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full transition-all duration-200">
+                    <i class="fas fa-camera text-sm"></i>
+                </button>
+            </div>
+            <div>
+                <h4 class="text-xl font-semibold">{{ current_admin.username }}</h4>
+                <p class="text-gray-400">
+                    {% if current_admin.role == 'Супер-администратор' %}
+                    Супер-администратор
+                    {% else %}
+                    Администратор
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <form x-data="profileForm()" @submit.prevent="updateProfile()" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Email</label>
+                <input type="email" x-model="formData.email"
+                       class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                       placeholder="Введите email">
+            </div>
+
+            {% if current_admin.role == 'Супер-администратор' %}
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Роль</label>
+                <select x-model="formData.role"
+                        class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50">
+                    <option value="admin">Администратор</option>
+                    <option value="Супер-администратор">Супер-администратор</option>
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="flex justify-end pt-4">
+                <button type="submit" :disabled="loading"
+                        class="btn-primary px-6 py-2 rounded-2xl font-medium disabled:opacity-50">
+                    <i class="fas fa-spinner fa-spin mr-2" x-show="loading"></i>
+                    Обновить профиль
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Change Password -->
+    <div class="glass-effect rounded-2xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Смена пароля</h3>
+        
+        <form x-data="passwordForm()" @submit.prevent="changePassword()" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Текущий пароль</label>
+                <input type="password" x-model="formData.current_password" required
+                       class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                       placeholder="Введите текущий пароль">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Новый пароль</label>
+                <input type="password" x-model="formData.new_password" required
+                       class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                       placeholder="Введите новый пароль">
+            </div>
+
+            <div class="flex justify-end pt-4">
+                <button type="submit" :disabled="loading"
+                        class="btn-primary px-6 py-2 rounded-2xl font-medium disabled:opacity-50">
+                    <i class="fas fa-spinner fa-spin mr-2" x-show="loading"></i>
+                    Сменить пароль
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Обработка загрузки аватарки
+document.getElementById('avatar-input').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Проверяем тип файла
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+
+        // Проверяем размер файла (максимум 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Размер файла не должен превышать 5MB');
+            return;
+        }
+
+        // Показываем превью
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('avatar-preview').src = e.target.result;
+            
+            // Отправляем на сервер
+            uploadAvatar(file);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+async function uploadAvatar(file) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const response = await fetch('/admin/api/admin/profile/avatar', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showNotification('Аватарка успешно обновлена', 'success');
+            // Обновляем аватарку во всех местах на странице
+            document.querySelectorAll('img[src*="avatar"]').forEach(img => {
+                if (img.src.includes('ui-avatars.com') || img.src.includes('gravatar')) {
+                    img.src = result.avatar_url + '?t=' + new Date().getTime();
+                }
+            });
+        } else {
+            showNotification(result.detail || 'Ошибка при загрузке аватарки', 'error');
+        }
+    } catch (error) {
+        console.error('Error uploading avatar:', error);
+        showNotification('Ошибка при загрузке аватарки', 'error');
+    }
+}
+
+function showNotification(message, type) {
+    if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+        Alpine.$data.pageUtils.showNotification(message, type);
+    } else {
+        alert(message);
+    }
+}
+
+document.addEventListener('alpine:init', () => {
+    Alpine.data('profileForm', () => ({
+        loading: false,
+        formData: {
+            email: '',
+            role: '{{ current_admin.role }}'
+        },
+        
+        async updateProfile() {
+            this.loading = true;
+            try {
+                const response = await fetch('/admin/api/admin/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    this.showNotification(result.message, 'success');
+                    // Обновляем страницу чтобы применить изменения
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    this.showNotification(result.detail, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                this.showNotification('Ошибка при обновлении профиля', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        showNotification(message, type) {
+            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                Alpine.$data.pageUtils.showNotification(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    }));
+    
+    Alpine.data('passwordForm', () => ({
+        loading: false,
+        formData: {
+            current_password: '',
+            new_password: ''
+        },
+        
+        async changePassword() {
+            this.loading = true;
+            try {
+                const response = await fetch('/admin/api/admin/profile/password', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    this.showNotification(result.message, 'success');
+                    this.formData = {
+                        current_password: '',
+                        new_password: ''
+                    };
+                } else {
+                    this.showNotification(result.detail, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error changing password:', error);
+                this.showNotification('Ошибка при смене пароля', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        showNotification(message, type) {
+            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                Alpine.$data.pageUtils.showNotification(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

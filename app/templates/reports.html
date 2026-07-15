@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block page_title %}Отчеты и аналитика{% endblock %}
+
+{% block content %}
+<div x-data="reports()" class="space-y-6">
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-blue-400 text-4xl mb-4"></i>
+        <p class="text-gray-400 text-lg">Загрузка отчетов...</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div x-show="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="glass-effect rounded-2xl p-6 card-hover">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm font-medium">Всего заказов</p>
+                    <p class="text-3xl font-bold mt-2" x-text="stats.total_orders || 0"></p>
+                </div>
+                <div class="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center">
+                    <i class="fas fa-box text-blue-400 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-effect rounded-2xl p-6 card-hover">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm font-medium">Завершено</p>
+                    <p class="text-3xl font-bold mt-2" x-text="stats.completed_orders || 0"></p>
+                </div>
+                <div class="w-12 h-12 bg-green-500/20 rounded-2xl flex items-center justify-center">
+                    <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-effect rounded-2xl p-6 card-hover">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm font-medium">Уникальных участников</p>
+                    <p class="text-3xl font-bold mt-2" x-text="stats.unique_participants || 0"></p>
+                </div>
+                <div class="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center">
+                    <i class="fas fa-users text-purple-400 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-effect rounded-2xl p-6 card-hover">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-400 text-sm font-medium">Неплательщиков</p>
+                    <p class="text-3xl font-bold mt-2" x-text="stats.payment_stats?.unpaid || 0"></p>
+                </div>
+                <div class="w-12 h-12 bg-red-500/20 rounded-2xl flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-red-400 text-xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reports Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Status Distribution -->
+        <div class="glass-effect rounded-2xl p-6">
+            <h3 class="text-lg font-semibold mb-4">Распределение по статусам</h3>
+            <div class="space-y-4">
+                <template x-for="status in statusStats" :key="status.name">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-300" x-text="status.name"></span>
+                        <div class="flex items-center space-x-4">
+                            <div class="w-32 bg-white/10 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" :style="`width: ${status.percentage}%`"></div>
+                            </div>
+                            <span class="text-gray-400 text-sm w-8" x-text="status.count"></span>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="statusStats.length === 0" class="text-center py-4 text-gray-500">
+                    <i class="fas fa-chart-pie text-2xl mb-2"></i>
+                    <p>Нет данных для отображения</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Country Distribution -->
+        <div class="glass-effect rounded-2xl p-6">
+            <h3 class="text-lg font-semibold mb-4">Распределение по странам</h3>
+            <div class="space-y-4">
+                <template x-for="country in countryStats" :key="country.name">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-300" x-text="country.name"></span>
+                        <div class="flex items-center space-x-4">
+                            <div class="w-32 bg-white/10 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" :style="`width: ${country.percentage}%`"></div>
+                            </div>
+                            <span class="text-gray-400 text-sm w-8" x-text="country.count"></span>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="countryStats.length === 0" class="text-center py-4 text-gray-500">
+                    <i class="fas fa-globe text-2xl mb-2"></i>
+                    <p>Нет данных для отображения</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Stats -->
+    <div class="glass-effect rounded-2xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Статистика платежей</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-center">
+                <div class="text-3xl font-bold text-blue-400" x-text="stats.payment_stats?.total || 0"></div>
+                <div class="text-gray-400 text-sm mt-2">Всего участников</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-green-400" x-text="stats.payment_stats?.paid || 0"></div>
+                <div class="text-gray-400 text-sm mt-2">Оплатили</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-red-400" x-text="stats.payment_stats?.unpaid || 0"></div>
+                <div class="text-gray-400 text-sm mt-2">Не оплатили</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Section -->
+    <div class="glass-effect rounded-2xl p-6">
+        <h3 class="text-lg font-semibold mb-4">Экспорт отчетов</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button @click="exportReport('orders')" class="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200 text-left group">
+                <i class="fas fa-file-excel text-green-400 text-2xl mb-3 group-hover:scale-110 transition-transform duration-200"></i>
+                <h4 class="font-semibold mb-2">Экспорт заказов (XLSX)</h4>
+                <p class="text-gray-400 text-sm">Все заказы в формате Excel</p>
+            </button>
+
+            <button @click="exportReport('participants')" class="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200 text-left group">
+                <i class="fas fa-file-excel text-blue-400 text-2xl mb-3 group-hover:scale-110 transition-transform duration-200"></i>
+                <h4 class="font-semibold mb-2">Экспорт участников (XLSX)</h4>
+                <p class="text-gray-400 text-sm">Список участников в Excel</p>
+            </button>
+
+            <button @click="exportReport('full')" class="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200 text-left group">
+                <i class="fas fa-file-excel text-purple-400 text-2xl mb-3 group-hover:scale-110 transition-transform duration-200"></i>
+                <h4 class="font-semibold mb-2">Полный отчет (XLSX)</h4>
+                <p class="text-gray-400 text-sm">Заказы и участники с листами</p>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('reports', () => ({
+        stats: {},
+        statusStats: [],
+        countryStats: [],
+        loading: true,
+        
+        async init() {
+            await this.loadReportsData();
+            this.loading = false;
+        },
+        
+        async loadReportsData() {
+            try {
+                // Загрузка аналитики
+                const analyticsResponse = await fetch('/admin/api/reports/analytics');
+                if (!analyticsResponse.ok) {
+                    throw new Error('Failed to load analytics');
+                }
+                const analyticsData = await analyticsResponse.json();
+                this.stats = analyticsData;
+                
+                // Преобразование данных для графиков
+                this.statusStats = Object.entries(analyticsData.status_stats || {}).map(([name, count]) => ({
+                    name,
+                    count,
+                    percentage: analyticsData.total_orders > 0 ? (count / analyticsData.total_orders * 100).toFixed(1) : 0
+                }));
+                
+                this.countryStats = Object.entries(analyticsData.country_stats || {}).map(([name, count]) => ({
+                    name: name === 'CN' ? 'Китай' : name === 'KR' ? 'Корея' : name,
+                    count,
+                    percentage: analyticsData.total_orders > 0 ? (count / analyticsData.total_orders * 100).toFixed(1) : 0
+                }));
+                
+            } catch (error) {
+                console.error('Error loading reports data:', error);
+                alert('Ошибка загрузки данных отчетов');
+            }
+        },
+        
+        async exportReport(type) {
+            try {
+                const response = await fetch(`/admin/api/reports/export/${type}`);
+                if (!response.ok) {
+                    throw new Error('Export failed');
+                }
+                
+                // Создаем и скачиваем XLSX файл
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // Получаем имя файла из заголовков ответа
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `${type}_report.xlsx`;
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                console.error('Error exporting report:', error);
+                alert('Ошибка при экспорте данных');
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

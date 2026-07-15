@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование группы - SEABLUU Admin{% endblock %}
+
+{% block page_title %}Группа: {{ group.name }}{% endblock %}
+
+{% block content %}
+<div x-data="groupEdit" class="space-y-6">
+
+    <!-- Group Info Header -->
+    <div class="glass-effect rounded-2xl p-6 border border-white/10 flex justify-between items-center">
+        <div>
+            <div class="flex items-center space-x-3">
+                <h2 class="text-2xl font-bold" x-text="group.name"></h2>
+                <button @click="updateGroupName" class="text-gray-400 hover:text-white"><i
+                        class="fas fa-pen text-sm"></i></button>
+            </div>
+            <p class="text-gray-400 mt-1">ID: <span x-text="group.id"></span> | Создана: <span
+                    x-text="new Date(group.created_at).toLocaleDateString()"></span></p>
+        </div>
+        <div>
+            <a href="/admin/groups" class="px-4 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5">Назад к
+                списку</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main: Orders List -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="glass-effect rounded-2xl overflow-hidden border border-white/10">
+                <div class="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+                    <h3 class="font-bold">Заказы в группе (<span x-text="orders.length"></span>)</h3>
+                </div>
+
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-white/5 border-b border-white/10 sticky top-0 backdrop-blur-md">
+                            <tr>
+                                <th class="p-3 font-medium text-gray-400">Order ID</th>
+                                <th class="p-3 font-medium text-gray-400">Клиент</th>
+                                <th class="p-3 font-medium text-gray-400">Статус</th>
+                                <th class="p-3 font-medium text-gray-400 text-right"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            <template x-for="order in orders" :key="order.order_id">
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="p-3 font-medium">
+                                        <a :href="`/admin/orders/${order.order_id}`"
+                                            class="text-blue-400 hover:underline" x-text="order.order_id"></a>
+                                    </td>
+                                    <td class="p-3 text-sm text-gray-300" x-text="order.client_name"></td>
+                                    <td class="p-3">
+                                        <span class="px-2 py-1 rounded text-xs border" :class="{
+                                                'border-green-500 text-green-400 bg-green-500/10': order.status.includes('получен') || order.status.includes('выкуплен'),
+                                                'border-yellow-500 text-yellow-400 bg-yellow-500/10': order.status.includes('ожидает'),
+                                                'border-gray-500 text-gray-400 bg-gray-500/10': !order.status.includes('получен') && !order.status.includes('выкуплен') && !order.status.includes('ожидает')
+                                              }" x-text="order.status"></span>
+                                    </td>
+                                    <td class="p-3 text-right">
+                                        <button @click="removeOrder(order.order_id)"
+                                            class="text-gray-500 hover:text-red-400"><i
+                                                class="fas fa-times"></i></button>
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-if="orders.length === 0 && !loading">
+                                <tr>
+                                    <td colspan="4" class="p-8 text-center text-gray-400">Нет заказов в этой группе</td>
+                                </tr>
+                            </template>
+                            <template x-if="loading">
+                                <tr>
+                                    <td colspan="4" class="p-8 text-center text-gray-400">Загрузка...</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Actions -->
+        <div class="space-y-6">
+            <!-- Batch Status Update -->
+            <div class="glass-effect rounded-2xl p-6 border border-white/10 space-y-4">
+                <h3 class="font-bold flex items-center"><i class="fas fa-magic mr-2 text-purple-400"></i> Массовые
+                    действия</h3>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Сменить статус всем</label>
+                    <select x-model="selectedStatus"
+                        class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="">Выберите статус...</option>
+                        <template x-for="status in statuses" :key="status">
+                            <option :value="status" x-text="status"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <button @click="updateStatus" :disabled="!selectedStatus"
+                    class="w-full btn-primary rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                    Применить
+                </button>
+            </div>
+
+            <!-- Add Orders -->
+            <div class="glass-effect rounded-2xl p-6 border border-white/10 space-y-4">
+                <h3 class="font-bold flex items-center"><i class="fas fa-plus-circle mr-2 text-green-400"></i> Добавить
+                    заказы</h3>
+
+                <div class="relative" @click.outside="searchResults = []">
+                    <label class="block text-sm text-gray-400 mb-1">Поиск заказов</label>
+                    <div class="relative">
+                        <input type="text" x-model="searchQuery" @input.debounce.300ms="searchOrders"
+                            class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 pl-10"
+                            placeholder="ID, Клиент или Метка...">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                        <button x-show="searchQuery" @click="searchQuery = ''; searchResults = []"
+                            class="absolute right-3 top-3 text-gray-400 hover:text-white">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <!-- Dropdown Results -->
+                    <div x-show="searchResults.length > 0"
+                        class="absolute z-10 w-full mt-2 bg-gray-900 border border-white/10 rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-md">
+                        <ul class="divide-y divide-white/5">
+                            <template x-for="result in searchResults" :key="result.order_id">
+                                <li @click="addToSelection(result)"
+                                    class="p-3 hover:bg-white/10 cursor-pointer flex justify-between items-center transition-colors">
+                                    <div>
+                                        <div class="font-medium" x-text="result.order_id"></div>
+                                        <div class="text-xs text-gray-400" x-text="result.client_name"></div>
+                                    </div>
+                                    <div class="text-xs px-2 py-1 rounded bg-white/5 text-gray-300"
+                                        x-text="result.status"></div>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Selected Orders -->
+                <div x-show="selectedOrdersToAdd.length > 0" class="space-y-2">
+                    <label class="block text-sm text-gray-400">Выбрано для добавления:</label>
+                    <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        <template x-for="item in selectedOrdersToAdd" :key="item.order_id">
+                            <div
+                                class="flex items-center space-x-2 bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm border border-blue-500/30">
+                                <span x-text="item.order_id"></span>
+                                <button @click="removeFromSelection(item.order_id)"
+                                    class="hover:text-white transition-colors">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <button @click="addOrders" :disabled="selectedOrdersToAdd.length === 0"
+                    class="w-full px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    Добавить (<span x-text="selectedOrdersToAdd.length"></span>)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('groupEdit', () => ({
+            group: {{ group | tojson | safe }},
+        statuses: {{ statuses | tojson | safe }},
+        orders: [],
+        loading: true,
+        selectedStatus: '',
+
+        // Search & Add Logic
+        searchQuery: '',
+        searchResults: [],
+        selectedOrdersToAdd: [],
+
+        async init() {
+        await this.loadOrders();
+    },
+
+        async loadOrders() {
+        this.loading = true;
+        try {
+            const response = await fetch(`/admin/api/groups/${this.group.id}/orders`);
+            const data = await response.json();
+            this.orders = data.orders || [];
+        } catch(e) {
+            console.error('Error loading orders:', e);
+        } finally {
+            this.loading = false;
+        }
+    },
+
+        async searchOrders() {
+        if(!this.searchQuery || this.searchQuery.length < 2) {
+        this.searchResults = [];
+        return;
+    }
+
+    try {
+        // Fetch with small limit for dropdown
+        const response = await fetch(`/admin/api/orders?search=${encodeURIComponent(this.searchQuery)}&limit=10`);
+        if (response.ok) {
+            const data = await response.json();
+            // Filter out orders already in group AND already selected
+            const currentIds = new Set(this.orders.map(o => o.order_id));
+            const selectedIds = new Set(this.selectedOrdersToAdd.map(o => o.order_id));
+
+            this.searchResults = data.orders.filter(o =>
+                !currentIds.has(o.order_id) && !selectedIds.has(o.order_id)
+            );
+        }
+    } catch (e) {
+        console.error('Error searching orders:', e);
+    }
+        },
+
+    addToSelection(order) {
+        this.selectedOrdersToAdd.push(order);
+        this.searchQuery = '';
+        this.searchResults = [];
+    },
+
+    removeFromSelection(orderId) {
+        this.selectedOrdersToAdd = this.selectedOrdersToAdd.filter(o => o.order_id !== orderId);
+    },
+        
+        async addOrders() {
+        if (this.selectedOrdersToAdd.length === 0) return;
+
+        const ids = this.selectedOrdersToAdd.map(o => o.order_id);
+
+        try {
+            const response = await fetch(`/admin/api/groups/${this.group.id}/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_ids: ids })
+            });
+
+            if (response.ok) {
+                this.selectedOrdersToAdd = [];
+                await this.loadOrders();
+            } else {
+                const data = await response.json();
+                alert(data.detail || 'Ошибка добавления заказов');
+            }
+        } catch (e) {
+            console.error('Error adding orders:', e);
+            alert('Ошибка добавления заказов');
+        }
+    },
+        
+        async updateStatus() {
+        if (!this.selectedStatus) return;
+        if (!confirm(`Вы уверены, что хотите установить статус '${this.selectedStatus}' для всех заказов в группе?`)) return;
+
+        try {
+            const response = await fetch(`/admin/api/groups/${this.group.id}/update_status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: this.selectedStatus })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`Статус обновлен для ${data.count} заказов`);
+                await this.loadOrders();
+            } else {
+                alert('Ошибка обновления статуса');
+            }
+        } catch (e) {
+            console.error('Error updating status:', e);
+            alert('Ошибка обновления статуса');
+        }
+    },
+        
+        async removeOrder(orderId) {
+        if (!confirm('Убрать заказ из группы?')) return;
+
+        try {
+            const response = await fetch(`/admin/api/groups/${this.group.id}/orders`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_ids: [orderId] })
+            });
+
+            if (response.ok) {
+                await this.loadOrders();
+            } else {
+                alert('Ошибка удаления заказа из группы');
+            }
+        } catch (e) {
+            console.error('Error removing order:', e);
+            alert('Ошибка удаления заказа');
+        }
+    },
+        
+        async updateGroupName() {
+        const newName = prompt('Введите новое название группы:', this.group.name);
+        if (newName && newName !== this.group.name) {
+            try {
+                const response = await fetch(`/admin/api/groups/${this.group.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.group = data.group;
+                } else {
+                    alert('Ошибка переименования группы');
+                }
+            } catch (e) {
+                console.error('Error renaming group:', e);
+                alert('Ошибка переименования группы');
+            }
+        }
+    }
+    }));
+});
+</script>
+{% endblock %}

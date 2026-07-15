@@ -1,0 +1,1100 @@
+{% extends "base.html" %}
+
+{% block page_title %}Управление заказами{% endblock %}
+
+{% block content %}
+<div x-data="orders()" class="space-y-4 lg:space-y-6">
+    <!-- Bulk Actions (Mobile Optimized) -->
+    <div x-show="selectedOrders.length > 0" x-transition:enter="transition-all duration-300 ease-out"
+        x-transition:enter-start="opacity-0 transform translate-y-4"
+        x-transition:enter-end="opacity-100 transform translate-y-0"
+        x-transition:leave="transition-all duration-200 ease-in"
+        x-transition:leave-start="opacity-100 transform translate-y-0"
+        x-transition:leave-end="opacity-0 transform translate-y-4" class="glass-effect rounded-2xl p-4 lg:p-6">
+
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
+            <div class="flex items-center space-x-3">
+                <span class="text-gray-400 text-sm lg:text-base">Выбрано: <span x-text="selectedOrders.length"
+                        class="font-semibold text-white"></span></span>
+            </div>
+
+            <div class="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-3">
+                <select x-model="bulkAction"
+                    class="custom-select w-full lg:w-auto bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm lg:text-base"
+                    data-touch-target>
+                    <option value="">Выберите действие...</option>
+                    <option value="update_status">Изменить статус</option>
+                    <option value="delete">Удалить выбранные</option>
+                </select>
+
+                <div x-show="bulkAction === 'update_status'"
+                    class="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-2">
+                    <select x-model="bulkStatus"
+                        class="custom-select w-full lg:w-auto bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm lg:text-base"
+                        data-touch-target>
+                        <option value="">Выберите статус...</option>
+                        {% for status in statuses %}
+                        <option value="{{ status }}">{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                    <button @click="applyBulkAction()"
+                        class="btn-primary px-4 py-3 rounded-2xl font-medium transition-all duration-200 text-sm lg:text-base"
+                        data-touch-target>
+                        Применить
+                    </button>
+                </div>
+
+                <button x-show="bulkAction === 'delete'" @click="applyBulkAction()"
+                    class="btn-primary px-4 py-3 rounded-2xl font-medium transition-all duration-200 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 text-sm lg:text-base"
+                    data-touch-target>
+                    Удалить выбранные
+                </button>
+            </div>
+
+            <button @click="clearSelection()"
+                class="text-gray-400 hover:text-white transition-colors duration-200 p-2 self-end lg:self-auto"
+                data-touch-target>
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters (Mobile Optimized) -->
+    <div class="glass-effect rounded-2xl p-4 lg:p-6"
+        x-data="{ showFilters: window.matchMedia('(min-width: 1024px)').matches }">
+        <!-- Mobile Filter Toggle Button -->
+        <div class="lg:hidden flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Фильтры</h3>
+            <button @click="showFilters = !showFilters"
+                class="px-4 py-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200"
+                data-touch-target>
+                <i class="fas fa-filter mr-2"></i>
+                <span x-text="showFilters ? 'Скрыть' : 'Показать'"></span>
+            </button>
+        </div>
+
+        <div x-show="showFilters || window.matchMedia('(min-width: 1024px)').matches"
+            class="responsive-grid gap-3 lg:gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Статус</label>
+                <select x-model="filters.status"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все статусы</option>
+                    {% for status in statuses %}
+                    <option value="{{ status }}">{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Страна</label>
+                <select x-model="filters.country"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все страны</option>
+                    <option value="CN">Китай (CN)</option>
+                    <option value="KR">Корея (KR)</option>
+                    <option value="JP">Япония (JP)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Метка Админа</label>
+                <select x-model="filters.note"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все метки</option>
+                    <template x-for="note in uniqueNotes" :key="note">
+                        <option x-text="note" :value="note"></option>
+                    </template>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Группа</label>
+                <select x-model="filters.group_id"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все группы</option>
+                    <template x-for="group in groups" :key="group.id">
+                        <option :value="group.id" x-text="group.name"></option>
+                    </template>
+                </select>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-400 mb-2">Поиск</label>
+                <input type="text" x-model="filters.search" placeholder="Order ID, клиент или метка..."
+                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+            </div>
+
+            <div class="flex flex-col lg:flex-row lg:items-end space-y-2 lg:space-y-0 lg:space-x-2">
+                <button @click="applyFilters()"
+                    class="flex-1 btn-primary px-4 py-3 rounded-2xl font-medium transition-all duration-200 text-sm lg:text-base"
+                    data-touch-target>
+                    <i class="fas fa-filter mr-2"></i>Применить
+                </button>
+                <button @click="resetFilters()"
+                    class="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl px-4 py-3 transition-all duration-200 text-sm lg:text-base"
+                    data-touch-target>
+                    <i class="fas fa-undo mr-2"></i>Сбросить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table (Mobile Optimized) -->
+    <div class="glass-effect rounded-2xl p-4 lg:p-6">
+        <!-- Header -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0 mb-4 lg:mb-6">
+            <div class="flex items-center space-x-3">
+                <h3 class="text-lg lg:text-xl font-semibold">Список заказов</h3>
+                <span class="text-gray-400 text-sm" x-text="`${filteredOrders.length} из ${totalOrders}`"></span>
+            </div>
+
+            <div class="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-3">
+                <button @click="selectAll()"
+                    class="px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200 text-sm lg:text-base"
+                    data-touch-target>
+                    <i class="fas fa-check-square mr-2"></i>Выбрать все
+                </button>
+                <a href="/admin/import"
+                    class="px-4 py-3 rounded-2xl bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50 transition-all duration-200 text-sm lg:text-base text-center"
+                    data-touch-target>
+                    <i class="fas fa-file-import mr-2"></i>Импорт
+                </a>
+                <a href="/admin/orders/new"
+                    class="btn-primary px-4 py-3 rounded-2xl font-medium text-sm lg:text-base text-center"
+                    data-touch-target>
+                    <i class="fas fa-plus mr-2"></i>Новый заказ
+                </a>
+            </div>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="lg:hidden space-y-3">
+            <template x-if="loading">
+                <div class="text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
+                    <p class="text-gray-400">Загрузка заказов...</p>
+                </div>
+            </template>
+
+            <template x-if="!loading && filteredOrders.length === 0">
+                <div class="text-center py-8">
+                    <i class="fas fa-inbox text-2xl mb-2"></i>
+                    <p class="text-gray-400">Заказы не найдены</p>
+                    <p class="text-sm text-gray-500 mt-1">Попробуйте изменить параметры фильтрации</p>
+                </div>
+            </template>
+
+            <template x-for="order in filteredOrders" :key="order.order_id">
+                <div class="bg-white/5 rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all duration-200"
+                    :class="{ 'border-blue-500/30 bg-blue-500/10': selectedOrders.includes(order.order_id) }">
+
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" :value="order.order_id" x-model="selectedOrders"
+                                class="rounded bg-white/5 border-white/10 text-blue-500 focus:ring-blue-500/50"
+                                data-touch-target>
+                            <span class="font-mono font-semibold text-sm" x-text="order.order_id"></span>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                            :class="getStatusClass(order.status)" x-text="order.status"></span>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Клиент:</span>
+                            <span x-text="order.client_name" class="truncate max-w-[120px]"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Страна:</span>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-mono"
+                                :class="order.country === 'CN' ? 'bg-red-500/20 text-red-400' : order.country === 'KR' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'"
+                                x-text="order.country"></span>
+                        </div>
+                        <div class="flex justify-between" x-show="order.note">
+                            <span class="text-gray-400">Метка:</span>
+                            <span
+                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400"
+                                x-text="order.note"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Обновлен:</span>
+                            <span class="text-gray-400 text-xs" x-text="formatDate(order.updated_at)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex justify-center space-x-2 mt-3 pt-3 border-t border-white/10">
+                        <button @click="viewOrder(order.order_id)"
+                            class="flex-1 p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-all duration-200 text-center"
+                            data-touch-target>
+                            <i class="fas fa-eye"></i>
+                            <span class="text-xs block mt-1">Просмотр</span>
+                        </button>
+                        <button @click="editOrder(order.order_id)"
+                            class="flex-1 p-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-xl transition-all duration-200 text-center"
+                            data-touch-target>
+                            <i class="fas fa-edit"></i>
+                            <span class="text-xs block mt-1">Редактировать</span>
+                        </button>
+                        <button @click="deleteOrder(order.order_id)"
+                            class="flex-1 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all duration-200 text-center"
+                            data-touch-target>
+                            <i class="fas fa-trash"></i>
+                            <span class="text-xs block mt-1">Удалить</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block">
+            <div class="mobile-table-container touch-scroll">
+                <table class="mobile-table">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium w-12">
+                                <input type="checkbox" @change="toggleAll()"
+                                    :checked="selectedOrders.length === filteredOrders.length && filteredOrders.length > 0"
+                                    class="rounded bg-white/5 border-white/10 text-blue-500 focus:ring-blue-500/50"
+                                    data-touch-target>
+                            </th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Order ID</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Клиент</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Статус</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Страна</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Метка Админа</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Обновлен</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-if="loading">
+                            <tr>
+                                <td colspan="8" class="py-8 text-center text-gray-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>Загрузка заказов...</p>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <template x-if="!loading && filteredOrders.length === 0">
+                            <tr>
+                                <td colspan="8" class="py-8 text-center text-gray-400">
+                                    <i class="fas fa-inbox text-2xl mb-2"></i>
+                                    <p>Заказы не найдены</p>
+                                    <p class="text-sm mt-2">Попробуйте изменить параметры фильтрации</p>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <template x-for="order in filteredOrders" :key="order.order_id">
+                            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors duration-200"
+                                :class="{ 'bg-blue-500/10': selectedOrders.includes(order.order_id) }">
+
+                                <td class="py-4 px-4">
+                                    <input type="checkbox" :value="order.order_id" x-model="selectedOrders"
+                                        class="rounded bg-white/5 border-white/10 text-blue-500 focus:ring-blue-500/50"
+                                        data-touch-target>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <span class="font-mono font-semibold" x-text="order.order_id"></span>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <div x-text="order.client_name" class="truncate max-w-xs"></div>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                                        :class="getStatusClass(order.status)" x-text="order.status"></span>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-mono"
+                                        :class="order.country === 'CN' ? 'bg-red-500/20 text-red-400' : order.country === 'KR' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'"
+                                        x-text="order.country"></span>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <template x-if="order.note">
+                                        <span
+                                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400"
+                                            x-text="order.note"></span>
+                                    </template>
+                                    <template x-if="!order.note">
+                                        <span class="text-gray-500 text-xs">—</span>
+                                    </template>
+                                </td>
+
+                                <td class="py-4 px-4 text-gray-400 text-sm" x-text="formatDate(order.updated_at)"></td>
+
+                                <td class="py-4 px-4">
+                                    <div class="mobile-table-actions">
+                                        <button @click="viewOrder(order.order_id)"
+                                            class="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-2xl transition-all duration-200"
+                                            title="Просмотр" data-touch-target>
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button @click="editOrder(order.order_id)"
+                                            class="p-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-2xl transition-all duration-200"
+                                            title="Редактировать" data-touch-target>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button @click="deleteOrder(order.order_id)"
+                                            class="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-2xl transition-all duration-200"
+                                            title="Удалить" data-touch-target>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0 mt-4 lg:mt-6">
+            <div class="text-gray-400 text-sm text-center lg:text-left">
+                Показано <span x-text="filteredOrders.length" class="font-semibold text-white"></span> из <span
+                    x-text="totalOrders" class="font-semibold text-white"></span> заказов
+            </div>
+
+            <div class="flex items-center justify-center space-x-2">
+                <button @click="prevPage()" :disabled="currentPage === 1 || loading"
+                    class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    data-touch-target>
+                    <i x-show="!loading" class="fas fa-chevron-left"></i>
+                    <i x-show="loading" class="fas fa-spinner fa-spin"></i>
+                </button>
+
+                <span class="px-4 py-2 text-sm">Страница <span x-text="currentPage" class="font-semibold"></span></span>
+
+                <button @click="nextPage()" :disabled="!hasMore || loading"
+                    class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    data-touch-target>
+                    <i x-show="!loading" class="fas fa-chevron-right"></i>
+                    <i x-show="loading" class="fas fa-spinner fa-spin"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования заказа (стиль и поля приведены к оформлению админки) -->
+<!-- Модальное окно просмотра заказа -->
+<div id="orderViewModal" class="hidden fixed inset-0 items-center justify-center z-50 bg-black/50 p-4">
+    <div id="orderViewDialog"
+        class="glass-effect rounded-2xl w-full max-w-2xl p-4 sm:p-6 relative transform transition-all duration-200 ease-out opacity-0 scale-95 translate-y-4 max-h-[90vh] overflow-auto">
+        <button onclick="window.closeViewModal && window.closeViewModal()"
+            class="absolute top-4 right-4 text-gray-400 hover:text-white transition-ease" aria-label="Закрыть"><i
+                class="fas fa-times"></i></button>
+        <div class="flex items-center space-x-3 mb-4">
+            <div class="avatar-gradient" id="view_avatar">ID</div>
+            <h3 class="text-2xl font-bold mb-0">Просмотр заказа</h3>
+        </div>
+
+        <div id="view_content" class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                <div class="bg-white/5 rounded-2xl p-3 border border-white/10 h-full flex flex-col justify-center">
+                    <label class="block text-sm font-medium text-muted mb-1">Order ID</label>
+                    <div id="view_order_id" class="font-mono font-semibold text-white text-lg">—</div>
+                </div>
+
+                <div class="bg-white/5 rounded-2xl p-3 border border-white/10 h-full flex flex-col justify-center">
+                    <label class="block text-sm font-medium text-muted mb-1">Страна</label>
+                    <div id="view_country"
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-mono text-white">—</div>
+                </div>
+
+                <div class="bg-white/5 rounded-2xl p-3 border border-white/10 h-full flex flex-col justify-center">
+                    <label class="block text-sm font-medium text-muted mb-1">Статус</label>
+                    <div id="view_status"
+                        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white">—</div>
+                </div>
+
+                <div class="bg-white/5 rounded-2xl p-3 border border-white/10 h-full flex flex-col justify-center">
+                    <label class="block text-sm font-medium text-muted mb-1">Метка Админа</label>
+                    <div id="view_note" class="text-sm text-white">—</div>
+                </div>
+
+                <div
+                    class="bg-white/5 rounded-2xl p-3 border border-white/10 sm:col-span-2 h-full flex flex-col justify-center">
+                    <label class="block text-sm font-medium text-muted mb-1">Подписчики</label>
+                    <div id="view_subscribers" class="text-sm text-white">0</div>
+                    <div id="view_subscribers_list" class="mt-2 space-y-1 text-sm max-h-24 overflow-auto text-white">
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white/5 rounded-2xl p-3 border border-white/10 sm:col-span-2 h-full flex flex-col justify-center">
+                    <label class="block text-sm font-medium text-muted mb-1">Участники</label>
+                    <div id="view_participants" class="space-y-2 max-h-40 overflow-auto py-1">
+                        <!-- participants will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-white/10">
+                <div class="flex space-x-2">
+                    <button id="view_edit_btn"
+                        class="btn-primary btn-accent-green px-4 py-2 rounded-2xl transition-ease text-sm">Редактировать</button>
+                    <button id="view_delete_btn"
+                        class="btn-accent-red px-4 py-2 rounded-2xl transition-ease text-sm">Удалить</button>
+                </div>
+                <button onclick="window.closeViewModal && window.closeViewModal()"
+                    class="px-4 py-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-ease text-sm">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="orderEditModal" class="hidden fixed inset-0 items-center justify-center z-50 bg-black/50 p-4">
+    <div id="orderEditDialog"
+        class="glass-effect rounded-2xl w-full max-w-2xl p-4 sm:p-6 relative transform transition-all duration-200 ease-out opacity-0 scale-95 translate-y-4 max-h-[90vh] overflow-auto">
+        <button onclick="window.closeEditModal && window.closeEditModal()"
+            class="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
+        <h3 class="text-lg font-semibold mb-4">Редактировать заказ</h3>
+
+        <form id="orderEditForm"
+            onsubmit="event.preventDefault(); window.submitEditForm && window.submitEditForm(event)">
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Order ID *</label>
+                    <input id="edit_order_id" type="text" readonly
+                        class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm"
+                        placeholder="CN-12345" />
+                    <div id="edit_error_order_id" class="text-xs text-red-400 mt-1"></div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Клиент *</label>
+                    <textarea id="edit_client_name" rows="2"
+                        class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm"
+                        placeholder="Имя клиента или @username..."></textarea>
+                    <div id="edit_error_client_name" class="text-xs text-red-400 mt-1"></div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Страна *</label>
+                    <select id="edit_country"
+                        class="styled-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm">
+                        <option value="">Выберите страну...</option>
+                        <option value="CN">CN</option>
+                        <option value="KR">KR</option>
+                        <option value="JP">JP</option>
+                    </select>
+                    <div id="edit_error_country" class="text-xs text-red-400 mt-1"></div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Статус *</label>
+                    <select id="edit_status"
+                        class="styled-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm">
+                        <option value="">Выберите статус...</option>
+                        {% for status in statuses %}
+                        <option value="{{ status }}">{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="edit_error_status" class="text-xs text-red-400 mt-1"></div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Метка Админа</label>
+                    <textarea id="edit_note" rows="2"
+                        class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm"
+                        placeholder="Смайлик или слово для идентификации заказа админом..."></textarea>
+                    <div id="edit_error_note" class="text-xs text-red-400 mt-1"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-6 border-t border-white/10">
+                <button type="button" onclick="window.closeEditModal && window.closeEditModal()"
+                    class="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-200">Отмена</button>
+                <button type="submit" class="btn-primary px-8 py-3 rounded-2xl font-medium">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('orders', () => ({
+            orders: [],
+            filteredOrders: [],
+            selectedOrders: [],
+            filters: {
+                status: '',
+                country: '',
+                note: '',
+                search: '',
+                group_id: ''
+            },
+            bulkAction: '',
+            bulkStatus: '',
+            currentPage: 1,
+            itemsPerPage: 20, // Reduced for mobile performance
+            totalOrders: 0,
+            hasMore: false,
+            loading: true,
+            uniqueNotes: [],
+            groups: [],
+
+            init() {
+                this.loadOrders();
+                this.loadGroups();
+                // Lazy load images if any
+                if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                    Alpine.$data.pageUtils.lazyLoadImages();
+                }
+
+                // expose modal handlers to global scope so modal (outside Alpine scope) can call them
+                try {
+                    window.openEditModal = this.openEditModal.bind(this);
+                    window.closeEditModal = this.closeEditModal.bind(this);
+                    window.submitEditForm = this.submitEditForm.bind(this);
+                    window.openViewModal = this.openViewModal.bind(this);
+                    window.closeViewModal = this.closeViewModal.bind(this);
+                } catch (e) {
+                    console.error('Error binding modal functions to window', e);
+                }
+            },
+
+            async loadOrders() {
+                this.loading = true;
+                try {
+                    const offset = (this.currentPage - 1) * this.itemsPerPage;
+                    let url = `/admin/api/orders?limit=${this.itemsPerPage}&offset=${offset}`;
+
+                    // Add filters to API request
+                    if (this.filters.status) {
+                        url += `&status=${encodeURIComponent(this.filters.status)}`;
+                    }
+                    if (this.filters.country) {
+                        url += `&country=${this.filters.country}`;
+                    }
+                    if (this.filters.note) {
+                        url += `&note=${encodeURIComponent(this.filters.note)}`;
+                    }
+                    if (this.filters.search) {
+                        url += `&search=${encodeURIComponent(this.filters.search)}`;
+                    }
+                    if (this.filters.group_id) {
+                        url += `&group_id=${this.filters.group_id}`;
+                    }
+
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    this.orders = data.orders || [];
+                    this.totalOrders = data.total || 0;
+                    this.hasMore = data.has_more || false;
+
+                    await this.loadUniqueNotes();
+                    this.filteredOrders = this.orders;
+                    this.selectedOrders = [];
+                } catch (error) {
+                    console.error('Error loading orders:', error);
+                    this.showNotification('Ошибка загрузки заказов', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // ... остальные методы остаются такими же как в оригинале ...
+            async loadUniqueNotes() {
+                try {
+                    const response = await fetch('/admin/api/orders/unique-notes');
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.uniqueNotes = data.notes || [];
+                    } else {
+                        this.uniqueNotes = [...new Set(this.orders
+                            .filter(order => order.note && order.note.trim() !== '')
+                            .map(order => order.note)
+                            .filter(note => note !== null && note !== undefined))];
+                    }
+                } catch (error) {
+                    this.uniqueNotes = [...new Set(this.orders
+                        .filter(order => order.note && order.note.trim() !== '')
+                        .map(order => order.note)
+                        .filter(note => note !== null && note !== undefined))];
+                }
+            },
+
+            async loadGroups() {
+                try {
+                    const response = await fetch('/admin/api/groups');
+                    const data = await response.json();
+                    this.groups = data.groups || [];
+                } catch (error) {
+                    console.error('Error loading groups:', error);
+                }
+            },
+
+            applyFilters() {
+                this.currentPage = 1;
+                this.loadOrders();
+            },
+
+            resetFilters() {
+                this.filters = { status: '', country: '', note: '', search: '', group_id: '' };
+                this.loadOrders();
+            },
+
+            getStatusClass(status) {
+                const statusMap = {
+                    '🛒 выкуплен': 'bg-blue-500/20 text-blue-400',
+                    '📦 отправка на адрес': 'bg-yellow-500/20 text-yellow-400',
+                    '📬 приехал на адрес': 'bg-purple-500/20 text-purple-400',
+                    '🛫 ожидает доставку': 'bg-orange-500/20 text-orange-400',
+                    '🚚 отправлен': 'bg-indigo-500/20 text-indigo-400',
+                    '🏠 приехал админу': 'bg-teal-500/20 text-teal-400',
+                    '✅ получен': 'bg-green-500/20 text-green-400',
+                    '❌ отменен': 'bg-red-500/20 text-red-400'
+                };
+
+                for (const [key, value] of Object.entries(statusMap)) {
+                    if (status.toLowerCase().includes(key.toLowerCase().replace(/[🛒📦📬🛫🚚🏠✅❌]/g, '').trim())) {
+                        return value;
+                    }
+                }
+
+                return 'bg-gray-500/20 text-gray-400';
+            },
+
+            viewOrder(orderId) {
+                // Открываем модальное окно просмотра заказа
+                this.openViewModal(orderId);
+            },
+
+            async openViewModal(orderId) {
+                try {
+                    const response = await fetch(`/admin/api/orders/${orderId}`);
+                    if (!response.ok) throw new Error('Не удалось загрузить данные заказа');
+                    const data = await response.json();
+                    const order = data.order || {};
+
+                    const modal = document.getElementById('orderViewModal');
+                    const dialog = document.getElementById('orderViewDialog');
+
+                    // populate
+                    modal.querySelector('#view_order_id').textContent = order.order_id || '';
+                    const avatarEl = modal.querySelector('#view_avatar');
+                    if (avatarEl) {
+                        const oid = order.order_id || '';
+                        avatarEl.textContent = oid ? (oid.length > 6 ? oid.slice(-6) : oid) : '—';
+                    }
+                    // 'Клиент' поле удалено from modal — participants shown below
+                    modal.querySelector('#view_country').textContent = order.country || '';
+                    modal.querySelector('#view_status').textContent = order.status || '';
+                    modal.querySelector('#view_note').textContent = order.note || '';
+                    modal.querySelector('#view_subscribers').textContent = data.subscribers || 0;
+
+                    // populate subscribers list (usernames)
+                    const subsList = modal.querySelector('#view_subscribers_list');
+                    if (subsList) {
+                        subsList.innerHTML = '';
+                        const subs = data.subscribers_list || [];
+                        if (subs.length === 0) {
+                            const emptyS = document.createElement('div');
+                            emptyS.className = 'text-sm text-gray-400';
+                            emptyS.textContent = 'Нет подписчиков';
+                            subsList.appendChild(emptyS);
+                        } else {
+                            subs.forEach(u => {
+                                const d = document.createElement('div');
+                                d.className = 'inline-block px-2 py-1 bg-white/5 rounded-md text-xs';
+                                d.textContent = u.startsWith('@') ? u : `@${u}`;
+                                subsList.appendChild(d);
+                            });
+                        }
+                    }
+
+                    // populate participants list
+                    const participants = data.participants || [];
+                    const pContainer = modal.querySelector('#view_participants');
+                    if (pContainer) {
+                        pContainer.innerHTML = '';
+                        if (participants.length === 0) {
+                            const empty = document.createElement('div');
+                            empty.className = 'text-sm text-gray-400';
+                            empty.textContent = 'Нет участников';
+                            pContainer.appendChild(empty);
+                        } else {
+                            participants.forEach(p => {
+                                const item = document.createElement('div');
+                                item.className = 'flex items-center justify-between bg-white/5 rounded-xl px-3 py-2';
+
+                                const left = document.createElement('div');
+                                left.className = 'text-sm text-white truncate';
+                                const usernameText = (p.username || (p.username === 0 ? p.username : ''));
+                                left.textContent = usernameText.startsWith('@') ? usernameText : `@${usernameText}`;
+
+                                const rightWrap = document.createElement('div');
+                                rightWrap.className = 'flex items-center space-x-2';
+
+                                const status = document.createElement('div');
+                                status.className = 'text-xs px-2 py-1 rounded-full';
+                                if (p.paid) {
+                                    status.className += ' bg-green-500/20 text-green-300';
+                                    status.textContent = 'Оплачен';
+                                } else {
+                                    status.className += ' bg-red-500/10 text-red-300';
+                                    status.textContent = 'Не оплачен';
+                                }
+
+                                const toggleBtn = document.createElement('button');
+                                toggleBtn.className = 'text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10';
+                                toggleBtn.textContent = p.paid ? 'Снять оплату' : 'Отметить как оплачен';
+                                toggleBtn.onclick = async () => {
+                                    try {
+                                        const resp = await fetch(`/admin/api/participants/${encodeURIComponent(order.order_id)}/${encodeURIComponent(p.username)}/paid`, { method: 'PUT' });
+                                        const res = await resp.json();
+                                        if (resp.ok) {
+                                            // toggle UI
+                                            p.paid = !p.paid;
+                                            if (p.paid) {
+                                                status.className = 'text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300';
+                                                status.textContent = 'Оплачен';
+                                                toggleBtn.textContent = 'Снять оплату';
+                                            } else {
+                                                status.className = 'text-xs px-2 py-1 rounded-full bg-red-500/10 text-red-300';
+                                                status.textContent = 'Не оплачен';
+                                                toggleBtn.textContent = 'Отметить как оплачен';
+                                            }
+                                            // optionally refresh orders list
+                                            // this.loadOrders();
+                                        } else {
+                                            this.showNotification(res.detail || 'Ошибка при обновлении оплаты участника', 'error');
+                                        }
+                                    } catch (err) {
+                                        console.error(err);
+                                        this.showNotification('Ошибка сети при обновлении оплаты участника', 'error');
+                                    }
+                                };
+
+                                rightWrap.appendChild(status);
+                                rightWrap.appendChild(toggleBtn);
+
+                                item.appendChild(left);
+                                item.appendChild(rightWrap);
+                                pContainer.appendChild(item);
+                            });
+                        }
+                    }
+
+                    // bind edit/delete buttons
+                    const editBtn = modal.querySelector('#view_edit_btn');
+                    const deleteBtn = modal.querySelector('#view_delete_btn');
+
+                    editBtn.onclick = () => {
+                        const dlg = dialog;
+                        const onTransitionEnd = (ev) => {
+                            // only trigger once
+                            dlg.removeEventListener('transitionend', onTransitionEnd);
+                            window.openEditModal && window.openEditModal(orderId);
+                        };
+                        // listen for transition end and then open edit modal
+                        dlg.addEventListener('transitionend', onTransitionEnd);
+                        this.closeViewModal();
+                    };
+
+                    deleteBtn.onclick = async () => {
+                        if (!confirm(`Удалить заказ ${orderId}?`)) return;
+                        try {
+                            const resp = await fetch(`/admin/api/orders/${orderId}`, { method: 'DELETE' });
+                            const res = await resp.json();
+                            if (resp.ok) {
+                                this.showNotification(res.message || 'Заказ удален', 'success');
+                                this.closeViewModal();
+                                this.loadOrders();
+                            } else {
+                                this.showNotification(res.detail || 'Ошибка при удалении', 'error');
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            this.showNotification('Ошибка сети при удалении заказа', 'error');
+                        }
+                    };
+
+                    this.clearEditErrors();
+
+                    // show
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    setTimeout(() => {
+                        dialog.classList.remove('opacity-0', 'scale-95', 'translate-y-4');
+                        dialog.classList.add('opacity-100', 'scale-100', 'translate-y-0');
+                    }, 10);
+
+                } catch (e) {
+                    console.error(e);
+                    this.showNotification('Ошибка при открытии просмотра заказа', 'error');
+                }
+            },
+
+            closeViewModal() {
+                const modal = document.getElementById('orderViewModal');
+                const dialog = document.getElementById('orderViewDialog');
+                dialog.classList.remove('opacity-100', 'scale-100', 'translate-y-0');
+                dialog.classList.add('opacity-0', 'scale-95', 'translate-y-4');
+                setTimeout(() => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                }, 220);
+            },
+
+            editOrder(orderId) {
+                // Открываем модальное окно для редактирования заказа
+                this.openEditModal(orderId);
+            },
+
+            async openEditModal(orderId) {
+                try {
+                    const response = await fetch(`/admin/api/orders/${orderId}`);
+                    if (!response.ok) {
+                        throw new Error('Не удалось загрузить данные заказа');
+                    }
+                    const data = await response.json();
+                    const order = data.order;
+
+                    const modal = document.getElementById('orderEditModal');
+                    const dialog = document.getElementById('orderEditDialog');
+                    modal.querySelector('#edit_order_id').value = order.order_id || '';
+                    modal.querySelector('#edit_client_name').value = order.client_name || '';
+                    modal.querySelector('#edit_country').value = order.country || '';
+                    modal.querySelector('#edit_status').value = order.status || '';
+                    modal.querySelector('#edit_note').value = order.note || '';
+
+                    this.clearEditErrors();
+
+                    // Показать overlay
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+
+                    // Небольшая задержка, чтобы CSS-переход сработал
+                    setTimeout(() => {
+                        dialog.classList.remove('opacity-0', 'scale-95', 'translate-y-4');
+                        dialog.classList.add('opacity-100', 'scale-100', 'translate-y-0');
+                    }, 10);
+
+                    // Фокусируем поле клиента (с небольшым таймаутом для плавности)
+                    setTimeout(() => {
+                        modal.querySelector('#edit_client_name').focus();
+                    }, 120);
+                } catch (e) {
+                    console.error(e);
+                    this.showNotification('Ошибка при открытии редактирования заказа', 'error');
+                }
+            },
+
+            closeEditModal() {
+                const modal = document.getElementById('orderEditModal');
+                const dialog = document.getElementById('orderEditDialog');
+
+                // Анимируем скрытие
+                dialog.classList.remove('opacity-100', 'scale-100', 'translate-y-0');
+                dialog.classList.add('opacity-0', 'scale-95', 'translate-y-4');
+
+                // После завершения анимации скрываем overlay
+                setTimeout(() => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                }, 220);
+            },
+
+            clearEditErrors() {
+                const fields = ['client_name', 'country', 'status', 'note'];
+                fields.forEach(f => {
+                    const el = document.getElementById(`edit_error_${f}`);
+                    if (el) el.textContent = '';
+                });
+            },
+
+            async submitEditForm(e) {
+                e.preventDefault();
+                const modal = document.getElementById('orderEditModal');
+                const orderId = modal.querySelector('#edit_order_id').value;
+                const payload = {
+                    client_name: modal.querySelector('#edit_client_name').value.trim(),
+                    country: modal.querySelector('#edit_country').value.trim(),
+                    status: modal.querySelector('#edit_status').value,
+                    note: modal.querySelector('#edit_note').value.trim()
+                };
+
+                try {
+                    const response = await fetch(`/admin/api/orders/${orderId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        this.showNotification(result.message || 'Заказ обновлён', 'success');
+                        this.closeEditModal();
+                        this.loadOrders();
+                    } else {
+                        if (result && result.errors) {
+                            this.clearEditErrors();
+                            for (const [field, msg] of Object.entries(result.errors)) {
+                                const el = document.getElementById(`edit_error_${field}`);
+                                if (el) el.textContent = msg;
+                            }
+                            this.showNotification('Ошибка в данных формы', 'error');
+                        } else {
+                            this.showNotification(result.detail || 'Ошибка при обновлении заказа', 'error');
+                        }
+                    }
+                } catch (err) {
+                    console.error(err);
+                    this.showNotification('Ошибка сети при обновлении заказа', 'error');
+                }
+            },
+
+            async deleteOrder(orderId) {
+                if (confirm(`Удалить заказ ${orderId}?`)) {
+                    try {
+                        const response = await fetch(`/admin/api/orders/${orderId}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
+                        this.showNotification(result.message, 'success');
+                        this.loadOrders();
+                    } catch (error) {
+                        this.showNotification('Ошибка при удалении заказа', 'error');
+                    }
+                }
+            },
+
+            selectAll() {
+                this.selectedOrders = this.filteredOrders.map(order => order.order_id);
+            },
+
+            toggleAll() {
+                if (this.selectedOrders.length === this.filteredOrders.length) {
+                    this.selectedOrders = [];
+                } else {
+                    this.selectAll();
+                }
+            },
+
+            clearSelection() {
+                this.selectedOrders = [];
+                this.bulkAction = '';
+                this.bulkStatus = '';
+            },
+
+            async applyBulkAction() {
+                if (this.selectedOrders.length === 0) {
+                    this.showNotification('Выберите заказы для действия', 'error');
+                    return;
+                }
+
+                if (this.bulkAction === 'update_status') {
+                    if (!this.bulkStatus) {
+                        this.showNotification('Выберите статус для обновления', 'error');
+                        return;
+                    }
+
+                    if (confirm(`Изменить статус ${this.selectedOrders.length} заказов на "${this.bulkStatus}"?`)) {
+                        try {
+                            const response = await fetch('/admin/api/orders/bulk-update-status', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    order_ids: this.selectedOrders,
+                                    status: this.bulkStatus
+                                })
+                            });
+
+                            const result = await response.json();
+                            if (response.ok) {
+                                this.showNotification(result.message, 'success');
+                                this.loadOrders();
+                                this.clearSelection();
+                            } else {
+                                this.showNotification(result.detail || 'Ошибка при обновлении статусов', 'error');
+                            }
+                        } catch (error) {
+                            this.showNotification('Ошибка при обновлении статусов', 'error');
+                        }
+                    }
+                } else if (this.bulkAction === 'delete') {
+                    if (confirm(`Удалить ${this.selectedOrders.length} выбранных заказов?`)) {
+                        try {
+                            const response = await fetch('/admin/api/orders/bulk-delete', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ order_ids: this.selectedOrders })
+                            });
+
+                            const result = await response.json();
+                            if (response.ok) {
+                                this.showNotification(result.message, 'success');
+                                this.loadOrders();
+                                this.clearSelection();
+                            } else {
+                                this.showNotification(result.detail || 'Ошибка при удалении заказов', 'error');
+                            }
+                        } catch (error) {
+                            this.showNotification('Ошибка при удалении заказов', 'error');
+                        }
+                    }
+                }
+            },
+
+            prevPage() {
+                if (this.currentPage > 1) {
+                    this.currentPage--;
+                    this.loadOrders();
+                }
+            },
+
+            nextPage() {
+                if (this.hasMore) {
+                    this.currentPage++;
+                    this.loadOrders();
+                }
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return 'Неизвестно';
+                try {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                } catch (e) {
+                    return 'Неизвестно';
+                }
+            },
+
+            showNotification(message, type = 'info') {
+                if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                    Alpine.$data.pageUtils.showNotification(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}

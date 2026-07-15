@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block page_title %}Миграция системы ролей{% endblock %}
+
+{% block content %}
+<div x-data="migration()" class="max-w-2xl mx-auto">
+    <div class="glass-effect rounded-2xl p-6">
+        <h1 class="text-2xl font-bold mb-6">Миграция системы ролей</h1>
+        
+        <div class="space-y-4">
+            <div class="bg-yellow-500/20 border border-yellow-500/50 rounded-2xl p-4">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-exclamation-triangle text-yellow-400 text-xl"></i>
+                    <div>
+                        <h3 class="font-semibold text-yellow-400">Внимание!</h3>
+                        <p class="text-yellow-300 text-sm">
+                            Эта операция обновит структуру базы данных. 
+                            Убедитесь, что у вас есть резервная копия перед запуском.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-blue-500/20 border border-blue-500/50 rounded-2xl p-4">
+                <h3 class="font-semibold text-blue-400 mb-2">Что будет сделано:</h3>
+                <ul class="text-blue-300 text-sm space-y-1">
+                    <li>• Создание таблицы ролей</li>
+                    <li>• Добавление стандартных ролей (супер-админ, админ, менеджер, наблюдатель)</li>
+                    <li>• Миграция существующих администраторов на новую систему</li>
+                    <li>• Обновление структуры базы данных</li>
+                </ul>
+            </div>
+            
+            <div class="flex justify-center">
+                <button @click="runMigration()" 
+                        :disabled="loading"
+                        class="btn-primary px-8 py-3 rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-database mr-2" x-show="!loading"></i>
+                    <i class="fas fa-spinner fa-spin mr-2" x-show="loading"></i>
+                    <span x-text="loading ? 'Запуск миграции...' : 'Запустить миграцию'"></span>
+                </button>
+            </div>
+            
+            <div x-show="result" class="bg-white/10 rounded-2xl p-4">
+                <h3 class="font-semibold mb-2" :class="result.success ? 'text-green-400' : 'text-red-400'">
+                    <i class="fas fa-check-circle mr-2" x-show="result.success"></i>
+                    <i class="fas fa-times-circle mr-2" x-show="!result.success"></i>
+                    <span x-text="result.success ? 'Миграция успешно завершена' : 'Ошибка миграции'"></span>
+                </h3>
+                
+                <div class="bg-black/20 rounded-xl p-3 max-h-64 overflow-y-auto">
+                    <pre class="text-sm whitespace-pre-wrap" x-text="result.stdout"></pre>
+                </div>
+                
+                <div x-show="result.stderr" class="mt-2">
+                    <h4 class="font-semibold text-red-400 mb-1">Ошибки:</h4>
+                    <div class="bg-red-500/20 rounded-xl p-3 max-h-32 overflow-y-auto">
+                        <pre class="text-sm whitespace-pre-wrap text-red-300" x-text="result.stderr"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('migration', () => ({
+        loading: false,
+        result: null,
+        
+        async runMigration() {
+            if (!confirm('Вы уверены, что хотите запустить миграцию? Эта операция может занять несколько секунд.')) {
+                return;
+            }
+            
+            this.loading = true;
+            this.result = null;
+            
+            try {
+                const response = await fetch('/admin/api/admin/migrate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                this.result = data;
+                
+            } catch (error) {
+                console.error('Migration error:', error);
+                this.result = {
+                    success: false,
+                    stdout: '',
+                    stderr: error.message,
+                    returncode: 1
+                };
+            } finally {
+                this.loading = false;
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

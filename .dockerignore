@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+.git
+.gitignore
+.env
+*.log
+Thumbs.db
+.DS_Store

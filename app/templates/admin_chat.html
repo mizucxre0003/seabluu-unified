@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block page_title %}Чат администраторов{% endblock %}
+
+{% block content %}
+<div x-data="adminChat()" class="h-full flex flex-col space-y-6">
+    <!-- Chat Header -->
+    <div class="glass-effect rounded-2xl p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold">Чат администраторов</h3>
+                <p class="text-gray-400 text-sm mt-1">Общайтесь с другими администраторами системы</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-sm text-gray-400">
+                    <span x-text="onlineCount"></span> онлайн
+                </div>
+                <button @click="loadMessages()" class="btn-primary px-4 py-2 rounded-2xl font-medium text-sm">
+                    <i class="fas fa-sync-alt mr-2"></i>Обновить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="glass-effect rounded-2xl p-6 flex-1 flex flex-col">
+        <!-- Messages Container -->
+        <div class="flex-1 overflow-y-auto mb-4 space-y-4" id="messages-container">
+            <template x-if="loading">
+                <div class="text-center py-8 text-gray-400">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p>Загрузка сообщений...</p>
+                </div>
+            </template>
+            
+            <template x-if="!loading && messages.length === 0">
+                <div class="text-center py-8 text-gray-400">
+                    <i class="fas fa-comments text-2xl mb-2"></i>
+                    <p>Пока нет сообщений</p>
+                    <p class="text-sm">Начните общение первым!</p>
+                </div>
+            </template>
+            
+            <template x-for="message in messages" :key="message.id">
+                <div class="flex items-start space-x-3" :class="message.user_id === currentUser.user_id ? 'flex-row-reverse space-x-reverse' : ''">
+                    <!-- Avatar -->
+                    <div class="flex-shrink-0">
+                        <template x-if="message.is_system">
+                            <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+                                <i class="fas fa-robot text-white text-sm"></i>
+                            </div>
+                        </template>
+                        <template x-if="!message.is_system">
+                            <img :src="message.avatar_url || 'https://ui-avatars.com/api/?name=' + message.username + '&background=random&size=64'" 
+                                 :alt="message.username" 
+                                 class="w-8 h-8 rounded-full flex-shrink-0">
+                        </template>
+                    </div>
+                    
+                    <!-- Message Content -->
+                    <div :class="message.user_id === currentUser.user_id ? 'bg-blue-500/20 border border-blue-500/30' : message.is_system ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-white/5 border border-white/10'"
+                         class="rounded-2xl p-3 max-w-xs lg:max-w-md">
+                        <!-- Message Header -->
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="text-sm font-medium" 
+                                  :class="message.is_system ? 'text-purple-400' : message.user_id === currentUser.user_id ? 'text-blue-400' : 'text-gray-300'"
+                                  x-text="message.username"></span>
+                            <span class="text-xs text-gray-400" x-text="formatTime(message.created_at)"></span>
+                            <template x-if="message.user_id === currentUser.user_id">
+                                <span class="text-xs text-blue-400">(Вы)</span>
+                            </template>
+                        </div>
+                        
+                        <!-- Message Text -->
+                        <p class="text-sm" x-text="message.message"></p>
+                        
+                        <!-- System Message Indicator -->
+                        <template x-if="message.is_system">
+                            <div class="mt-1 text-xs text-purple-400">
+                                <i class="fas fa-robot mr-1"></i>Системное сообщение
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Message Input -->
+        <div class="flex space-x-2">
+            <input type="text" 
+                   x-model="newMessage" 
+                   @keyup.enter="sendMessage()"
+                   placeholder="Введите сообщение..." 
+                   class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                   :disabled="sending">
+            <button @click="sendMessage()" 
+                    :disabled="!newMessage.trim() || sending"
+                    class="btn-primary px-4 py-3 rounded-2xl font-medium disabled:opacity-50">
+                <template x-if="!sending">
+                    <i class="fas fa-paper-plane"></i>
+                </template>
+                <template x-if="sending">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </template>
+            </button>
+        </div>
+        
+        <!-- Typing Indicator -->
+        <div x-show="typing" class="mt-2 text-sm text-gray-400">
+            <i class="fas fa-pencil-alt mr-2"></i>
+            <span x-text="typingUser"></span> печатает...
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('adminChat', () => ({
+        messages: [],
+        newMessage: '',
+        loading: true,
+        sending: false,
+        typing: false,
+        typingUser: '',
+        onlineCount: 1,
+        currentUser: {
+            user_id: {{ current_admin.user_id }},
+            username: '{{ current_admin.username }}'
+        },
+        
+        async init() {
+            await this.loadMessages();
+            this.scrollToBottom();
+            
+            // Автообновление сообщений каждые 10 секунд
+            setInterval(() => {
+                this.loadMessages();
+            }, 10000);
+        },
+        
+        async loadMessages() {
+            try {
+                const response = await fetch('/admin/api/admin/chat/messages');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                this.messages = data.messages || [];
+                this.loading = false;
+                this.scrollToBottom();
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                this.loading = false;
+                this.showNotification('Ошибка загрузки сообщений', 'error');
+            }
+        },
+        
+        async sendMessage() {
+            if (!this.newMessage.trim() || this.sending) return;
+            
+            this.sending = true;
+            
+            try {
+                const response = await fetch('/admin/api/admin/chat/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: this.newMessage
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    this.newMessage = '';
+                    await this.loadMessages();
+                    this.showNotification('Сообщение отправлено', 'success');
+                } else {
+                    throw new Error(result.detail || 'Ошибка отправки сообщения');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                this.showNotification('Ошибка отправки сообщения: ' + error.message, 'error');
+            } finally {
+                this.sending = false;
+            }
+        },
+        
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const container = document.getElementById('messages-container');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            });
+        },
+        
+        formatTime(dateString) {
+            if (!dateString) return '';
+            try {
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / (1000 * 60));
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                
+                if (diffMins < 1) {
+                    return 'только что';
+                } else if (diffMins < 60) {
+                    return `${diffMins} мин назад`;
+                } else if (diffHours < 24) {
+                    return `${diffHours} ч назад`;
+                } else {
+                    return date.toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            } catch (e) {
+                return '';
+            }
+        },
+        
+        showNotification(message, type = 'info') {
+            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                Alpine.$data.pageUtils.showNotification(message, type);
+            } else {
+                // Fallback notification
+                const notification = document.createElement('div');
+                notification.className = `fixed top-4 right-4 glass-effect rounded-2xl p-4 border z-50 ${
+                    type === 'error' ? 'bg-red-500/20 border-red-500/50' : 
+                    type === 'success' ? 'bg-green-500/20 border-green-500/50' : 
+                    'bg-blue-500/20 border-blue-500/50'
+                }`;
+                notification.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'} 
+                            ${type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-blue-400'}"></i>
+                        <span>${message}</span>
+                    </div>
+                `;
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 5000);
+            }
+        },
+        
+        // Simulate typing indicator (for demo purposes)
+        simulateTyping() {
+            if (!this.typing) {
+                this.typing = true;
+                this.typingUser = 'Другой администратор';
+                
+                setTimeout(() => {
+                    this.typing = false;
+                    this.typingUser = '';
+                }, 2000);
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

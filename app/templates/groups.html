@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Группы заказов - SEABLUU Admin{% endblock %}
+
+{% block page_title %}Группы заказов{% endblock %}
+
+{% block content %}
+<div x-data="groupsPage" class="space-y-6">
+
+    <!-- Actions -->
+    <div class="flex justify-between items-center">
+        <button @click="openCreateModal" class="btn-primary rounded-xl flex items-center space-x-2">
+            <i class="fas fa-plus"></i>
+            <span>Создать группу</span>
+        </button>
+    </div>
+
+    <!-- Groups List -->
+    <div class="glass-effect rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-white/5 border-b border-white/10">
+                    <tr>
+                        <th class="p-4 font-medium text-gray-400">ID</th>
+                        <th class="p-4 font-medium text-gray-400">Название</th>
+                        <th class="p-4 font-medium text-gray-400">Заказов</th>
+                        <th class="p-4 font-medium text-gray-400">Дата создания</th>
+                        <th class="p-4 font-medium text-gray-400 text-right">Действия</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-gray-400">
+                                <i class="fas fa-circle-notch fa-spin mr-2"></i> Загрузка...
+                            </td>
+                        </tr>
+                    </template>
+
+                    <template x-for="group in groups" :key="group.id">
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="p-4 text-gray-300" x-text="group.id"></td>
+                            <td class="p-4 font-medium text-white">
+                                <a :href="`/admin/groups/${group.id}`" class="hover:text-blue-400 transition-colors"
+                                    x-text="group.name"></a>
+                            </td>
+                            <td class="p-4">
+                                <span class="px-2 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-xs"
+                                    x-text="group.order_count || 0"></span>
+                            </td>
+                            <td class="p-4 text-gray-400 text-sm"
+                                x-text="new Date(group.created_at).toLocaleDateString()"></td>
+                            <td class="p-4 text-right space-x-2">
+                                <a :href="`/admin/groups/${group.id}`" class="text-gray-400 hover:text-white p-2">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button @click="deleteGroup(group.id)" class="text-gray-400 hover:text-red-400 p-2">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <template x-if="!loading && groups.length === 0">
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-gray-400">
+                                Групп пока нет. Создайте первую группу!
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Modal (Manual ID-based control like Orders page) -->
+    <div id="createGroupModal"
+        class="hidden fixed inset-0 z-50 items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div id="createGroupDialog"
+            class="glass-effect p-6 rounded-2xl w-full max-w-md m-4 space-y-4 bg-gray-900 border border-white/10 opacity-0 scale-95 translate-y-4 transition-all duration-300">
+            <h3 class="text-xl font-bold">Новая группа</h3>
+
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Название группы</label>
+                <input type="text" id="newGroupName" x-model="newGroupName"
+                    class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Например: Выкуп 25.12" @keydown.enter="createGroup">
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button @click="closeCreateModal"
+                    class="px-4 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5">
+                    Отмена
+                </button>
+                <button @click="createGroup" class="btn-primary rounded-xl">
+                    Создать
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('groupsPage', () => ({
+            groups: [],
+            loading: true,
+            newGroupName: '',
+
+            async init() {
+                await this.loadGroups();
+            },
+
+            async loadGroups() {
+                this.loading = true;
+                try {
+                    const response = await fetch('/admin/api/groups');
+                    const data = await response.json();
+                    this.groups = data.groups || [];
+                } catch (e) {
+                    console.error('Error loading groups:', e);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            openCreateModal() {
+                this.newGroupName = '';
+                const modal = document.getElementById('createGroupModal');
+                const dialog = document.getElementById('createGroupDialog');
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                // Focus input
+                setTimeout(() => {
+                    document.getElementById('newGroupName').focus();
+                }, 50);
+
+                // Animate in
+                requestAnimationFrame(() => {
+                    dialog.classList.remove('opacity-0', 'scale-95', 'translate-y-4');
+                    dialog.classList.add('opacity-100', 'scale-100', 'translate-y-0');
+                });
+            },
+
+            closeCreateModal() {
+                const modal = document.getElementById('createGroupModal');
+                const dialog = document.getElementById('createGroupDialog');
+
+                // Animate out
+                dialog.classList.remove('opacity-100', 'scale-100', 'translate-y-0');
+                dialog.classList.add('opacity-0', 'scale-95', 'translate-y-4');
+
+                setTimeout(() => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                }, 300);
+            },
+
+            async createGroup() {
+                if (!this.newGroupName.trim()) return;
+
+                try {
+                    const response = await fetch('/admin/api/groups', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: this.newGroupName })
+                    });
+
+                    if (response.ok) {
+                        this.closeCreateModal();
+                        await this.loadGroups();
+                    } else {
+                        const data = await response.json();
+                        alert(data.detail || 'Ошибка создания группы');
+                    }
+                } catch (e) {
+                    console.error('Error creating group:', e);
+                    alert('Ошибка создания группы');
+                }
+            },
+
+            async deleteGroup(id) {
+                if (!confirm('Вы уверены, что хотите удалить эту группу? Заказы в ней не будут удалены.')) return;
+
+                try {
+                    const response = await fetch(`/admin/api/groups/${id}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        await this.loadGroups();
+                    } else {
+                        alert('Ошибка удаления группы');
+                    }
+                } catch (e) {
+                    console.error('Error deleting group:', e);
+                    alert('Ошибка удаления группы');
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}

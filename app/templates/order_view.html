@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block page_title %}Просмотр заказа {{ order.order_id }}{% endblock %}
+
+{% block content %}
+<div x-data="orderView()" class="max-w-4xl mx-auto">
+    <!-- Заголовок и навигация -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold">Просмотр заказа</h1>
+            <p class="text-gray-400 mt-1">Детальная информация о заказе и участниках</p>
+        </div>
+        <a href="/admin/orders" class="px-4 py-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200">
+            <i class="fas fa-arrow-left mr-2"></i>Назад к заказам
+        </a>
+    </div>
+
+    <!-- Основная информация о заказе -->
+    <div class="glass-effect rounded-2xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">Информация о заказе</h2>
+            <a href="/admin/orders/{{ order.order_id }}/edit" 
+               class="px-4 py-2 rounded-2xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 hover:border-blue-500/50 transition-all duration-200">
+                <i class="fas fa-edit mr-2"></i>Редактировать
+            </a>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">ID заказа</label>
+                    <p class="font-mono text-lg font-semibold">{{ order.order_id }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Клиент</label>
+                    <p>{{ order.client_name }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Страна</label>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
+                        {% if order.country == 'CN' %}bg-red-500/20 text-red-400
+                        {% elif order.country == 'KR' %}bg-blue-500/20 text-blue-400
+                        {% else %}bg-yellow-500/20 text-yellow-400{% endif %}">
+                        {{ order.country }}
+                    </span>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Статус</label>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
+                        {% if 'доставлен' in order.status.lower() %}bg-green-500/20 text-green-400
+                        {% elif 'отмен' in order.status.lower() %}bg-red-500/20 text-red-400
+                        {% else %}bg-yellow-500/20 text-yellow-400{% endif %}">
+                        {{ order.status }}
+                    </span>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Метка Админа</label>
+                    <p>{{ order.note or '—' }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Создан</label>
+                    <p>
+                        {% if order.created_at %}
+                            {{ order.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        {% else %}
+                            Неизвестно
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Участники заказа -->
+    <div class="glass-effect rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">Участники заказа</h2>
+            <div class="text-sm text-gray-400">
+                {{ participants|length }} участников
+            </div>
+        </div>
+
+        <!-- Статистика оплат -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="text-center p-4 bg-white/5 rounded-2xl">
+                <div class="text-2xl font-bold text-blue-400" x-text="participants.length">{{ participants|length }}</div>
+                <div class="text-sm text-gray-400">Всего участников</div>
+            </div>
+            <div class="text-center p-4 bg-white/5 rounded-2xl">
+                <div class="text-2xl font-bold text-green-400" x-text="paidParticipants">{{ participants|selectattr('paid')|list|length }}</div>
+                <div class="text-sm text-gray-400">Оплачено</div>
+            </div>
+            <div class="text-center p-4 bg-white/5 rounded-2xl">
+                <div class="text-2xl font-bold text-red-400" x-text="unpaidParticipants">{{ participants|rejectattr('paid')|list|length }}</div>
+                <div class="text-sm text-gray-400">Не оплачено</div>
+            </div>
+        </div>
+
+        <!-- Список участников -->
+        <div class="space-y-3">
+            {% for participant in participants %}
+            <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-200">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-white text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium">@{{ participant.username }}</div>
+                        <div class="text-sm text-gray-400">
+                            {% if participant.updated_at %}
+                                {{ participant.updated_at.strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                Неизвестно
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button @click="togglePayment('{{ participant.username }}', {{ participant.paid|lower }})" 
+                            class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all duration-200"
+                            :class="{{ participant.paid|lower }} ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'"
+                            data-touch-target>
+                        <i class="fas fa-credit-card mr-2"></i>
+                        <span x-text="{{ participant.paid|lower }} ? 'Оплачено' : 'Не оплачено'">{{ 'Оплачено' if participant.paid else 'Не оплачено' }}</span>
+                    </button>
+                    
+                    <button @click="sendReminder('{{ participant.username }}')" 
+                            class="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-2xl transition-all duration-200" 
+                            title="Напомнить об оплате"
+                            data-touch-target>
+                        <i class="fas fa-bell"></i>
+                    </button>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-users text-gray-500 text-3xl mb-2"></i>
+                <p class="text-gray-400">Участники не найдены</p>
+                <p class="text-gray-500 text-sm mt-1">Добавьте участников в заказ</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Действия с участниками -->
+        {% if participants %}
+        <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3 mt-6 pt-6 border-t border-white/10">
+            <button @click="broadcastUnpaid()" 
+                    class="flex-1 px-4 py-3 rounded-2xl bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/50 transition-all duration-200"
+                    data-touch-target>
+                <i class="fas fa-bullhorn mr-2"></i>Уведомить всех неплательщиков
+            </button>
+            
+            <button @click="exportParticipants()" 
+                    class="flex-1 px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200"
+                    data-touch-target>
+                <i class="fas fa-download mr-2"></i>Экспорт участников
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('orderView', () => ({
+        participants: [],
+        
+        get paidParticipants() {
+            return this.participants.filter(p => p.paid).length;
+        },
+        
+        get unpaidParticipants() {
+            return this.participants.filter(p => !p.paid).length;
+        },
+        
+        init() {
+            // Инициализация данных участников из HTML
+            this.participants = Array.from(document.querySelectorAll('[data-participant]')).map(el => ({
+                username: el.dataset.participant,
+                paid: el.dataset.paid === 'true'
+            }));
+        },
+        
+        async togglePayment(username, currentPaidStatus) {
+            try {
+                const orderId = window.location.pathname.split('/').pop();
+                const response = await fetch(`/admin/api/participants/${orderId}/${username}/paid`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Обновляем статус в локальном массиве
+                    const participant = this.participants.find(p => p.username === username);
+                    if (participant) {
+                        participant.paid = !currentPaidStatus;
+                    }
+                    
+                    // Перезагружаем страницу для обновления данных
+                    location.reload();
+                } else {
+                    this.showNotification('Ошибка при изменении статуса оплаты', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling payment:', error);
+                this.showNotification('Ошибка при изменении статуса оплаты', 'error');
+            }
+        },
+        
+        async sendReminder(username) {
+            try {
+                const orderId = window.location.pathname.split('/').pop();
+                const message = `🔔 Напоминание о задолженности по заказу ${orderId}. Пожалуйста, оплатите ваш заказ.`;
+                
+                const response = await fetch('/admin/api/broadcast/reminder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        usernames: [username]
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Ошибка отправки напоминания');
+                }
+                
+                this.showNotification(`Напоминание отправлено @${username}`, 'success');
+                
+            } catch (error) {
+                console.error('Error sending reminder:', error);
+                this.showNotification('Ошибка отправки напоминания', 'error');
+            }
+        },
+        
+        async broadcastUnpaid() {
+            const unpaid = this.participants.filter(p => !p.paid);
+            
+            if (unpaid.length === 0) {
+                this.showNotification('Нет неплательщиков для уведомления', 'info');
+                return;
+            }
+            
+            if (confirm(`Отправить уведомление ${unpaid.length} неплательщикам?`)) {
+                try {
+                    const orderId = window.location.pathname.split('/').pop();
+                    const message = `🔔 Напоминание о задолженности по заказу ${orderId}. Пожалуйста, оплатите ваш заказ.`;
+                    
+                    const response = await fetch('/admin/api/broadcast/reminder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            usernames: unpaid.map(p => p.username)
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Ошибка отправки уведомлений');
+                    }
+                    
+                    this.showNotification(`Уведомления отправлены ${unpaid.length} неплательщикам`, 'success');
+                    
+                } catch (error) {
+                    console.error('Error broadcasting to unpaid:', error);
+                    this.showNotification('Ошибка отправки уведомлений', 'error');
+                }
+            }
+        },
+        
+        exportParticipants() {
+            const csvContent = this.convertToCSV(this.participants);
+            const orderId = window.location.pathname.split('/').pop();
+            this.downloadCSV(csvContent, `participants_${orderId}.csv`);
+        },
+        
+        convertToCSV(participants) {
+            const headers = ['Username', 'Paid', 'Updated At'];
+            const rows = participants.map(p => [
+                `@${p.username}`,
+                p.paid ? 'Да' : 'Нет',
+                new Date().toLocaleDateString('ru-RU')
+            ]);
+            
+            return [headers, ...rows].map(row => row.join(',')).join('\n');
+        },
+        
+        downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        },
+        
+        showNotification(message, type = 'info') {
+            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                Alpine.$data.pageUtils.showNotification(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

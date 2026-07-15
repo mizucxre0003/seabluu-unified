@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+
+{% block page_title %}Участники{% endblock %}
+
+{% block content %}
+<div x-data="participants()" class="space-y-4 lg:space-y-6">
+    <!-- Filters -->
+    <div class="glass-effect rounded-2xl p-4 lg:p-6">
+        <div class="responsive-grid gap-3 lg:gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Заказ</label>
+                <select x-model="filters.order_id" @change="applyFilters()"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все заказы</option>
+                    <template x-for="order in orders" :key="order.order_id">
+                        <option :value="order.order_id" x-text="order.order_id"></option>
+                    </template>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Группа</label>
+                <select x-model="filters.group_id" @change="applyFilters()"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все группы</option>
+                    <template x-for="group in groups" :key="group.id">
+                        <option :value="group.id" x-text="group.name"></option>
+                    </template>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Статус оплаты</label>
+                <select x-model="filters.paid" @change="applyFilters()"
+                    class="custom-select w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+                    <option value="">Все</option>
+                    <option value="true">Оплачено</option>
+                    <option value="false">Не оплачено</option>
+                </select>
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-400 mb-2">Поиск</label>
+                <input type="text" x-model="filters.search" @input="applyFilters()" placeholder="Username..."
+                    class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    data-touch-target>
+            </div>
+        </div>
+    </div>
+
+    <!-- Participants -->
+    <div class="glass-effect rounded-2xl p-4 lg:p-6">
+        <!-- Header -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0 mb-4 lg:mb-6">
+            <div>
+                <h3 class="text-lg lg:text-xl font-semibold">Список участников</h3>
+                <div class="text-gray-400 text-sm mt-1">
+                    Показано <span x-text="filteredParticipants.length" class="font-semibold text-white"></span> из
+                    <span x-text="totalParticipants" class="font-semibold text-white"></span> участников
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-3">
+                <button @click="exportParticipants()"
+                    class="px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-200 text-sm lg:text-base text-center"
+                    data-touch-target>
+                    <i class="fas fa-download mr-2"></i>Экспорт
+                </button>
+                <button @click="broadcastUnpaid()"
+                    class="px-4 py-3 rounded-2xl bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/50 transition-all duration-200 text-sm lg:text-base text-center"
+                    data-touch-target>
+                    <i class="fas fa-bullhorn mr-2"></i>Уведомить
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div x-show="loading" class="text-center py-8">
+            <i class="fas fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
+            <p class="text-gray-400">Загрузка участников...</p>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="lg:hidden space-y-3">
+            <template x-if="!loading && filteredParticipants.length === 0">
+                <div class="text-center py-8">
+                    <i class="fas fa-users text-gray-500 text-3xl mb-2"></i>
+                    <p class="text-gray-400">Участники не найдены</p>
+                    <p class="text-gray-500 text-sm mt-1">Попробуйте изменить параметры фильтрации</p>
+                </div>
+            </template>
+
+            <template x-for="participant in filteredParticipants"
+                :key="`${participant.order_id}-${participant.username}`">
+                <div
+                    class="bg-white/5 rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all duration-200">
+
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div
+                                class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-white text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="font-medium text-sm" x-text="'@' + participant.username"></span>
+                                <div class="text-gray-400 text-xs" x-text="participant.order_id"></div>
+                            </div>
+                        </div>
+
+                        <button @click="togglePayment(participant)"
+                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-all duration-200"
+                            :class="participant.paid ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'"
+                            data-touch-target>
+                            <i class="fas fa-credit-card mr-1"></i>
+                            <span x-text="participant.paid ? 'Оплачено' : 'Не оплачено'"></span>
+                        </button>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Дата:</span>
+                            <span class="text-gray-400 text-xs" x-text="formatDate(participant.updated_at)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex justify-center space-x-2 mt-3 pt-3 border-t border-white/10">
+                        <button @click="sendReminder(participant)"
+                            class="flex-1 p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-xl transition-all duration-200 text-center"
+                            data-touch-target>
+                            <i class="fas fa-bell"></i>
+                            <span class="text-xs block mt-1">Напомнить</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block">
+            <div x-show="!loading && filteredParticipants.length > 0" class="mobile-table-container touch-scroll">
+                <table class="mobile-table">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Username</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Заказ</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Статус оплаты</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Дата</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="participant in filteredParticipants"
+                            :key="`${participant.order_id}-${participant.username}`">
+                            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors duration-200">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center space-x-3">
+                                        <div
+                                            class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-user text-white text-xs"></i>
+                                        </div>
+                                        <span class="font-medium" x-text="'@' + participant.username"></span>
+                                    </div>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <span class="font-mono font-semibold" x-text="participant.order_id"></span>
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <button @click="togglePayment(participant)"
+                                        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-all duration-200"
+                                        :class="participant.paid ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'"
+                                        data-touch-target>
+                                        <i class="fas fa-credit-card mr-2"></i>
+                                        <span x-text="participant.paid ? 'Оплачено' : 'Не оплачено'"></span>
+                                    </button>
+                                </td>
+
+                                <td class="py-4 px-4 text-gray-400 text-sm" x-text="formatDate(participant.updated_at)">
+                                </td>
+
+                                <td class="py-4 px-4">
+                                    <div class="mobile-table-actions">
+                                        <button @click="sendReminder(participant)"
+                                            class="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-2xl transition-all duration-200"
+                                            title="Напомнить" data-touch-target>
+                                            <i class="fas fa-bell"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Empty State for Desktop -->
+        <div x-show="!loading && filteredParticipants.length === 0" class="hidden lg:block text-center py-12">
+            <i class="fas fa-users text-gray-500 text-5xl mb-4"></i>
+            <p class="text-gray-400 text-lg">Участники не найдены</p>
+            <p class="text-gray-500 text-sm mt-2">Попробуйте изменить параметры фильтрации</p>
+        </div>
+
+        <!-- Empty State for Mobile -->
+        <div x-show="!loading && filteredParticipants.length === 0" class="lg:hidden text-center py-8">
+            <i class="fas fa-users text-gray-500 text-3xl mb-2"></i>
+            <p class="text-gray-400">Участники не найдены</p>
+            <p class="text-gray-500 text-sm mt-1">Попробуйте изменить параметры фильтрации</p>
+        </div>
+
+        <!-- Pagination -->
+        <div x-show="!loading && filteredParticipants.length > 0"
+            class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0 mt-4 lg:mt-6">
+
+            <div class="text-gray-400 text-sm text-center lg:text-left">
+                Страница <span x-text="currentPage" class="font-semibold text-white"></span>
+            </div>
+
+            <div class="flex items-center justify-center space-x-2">
+                <button @click="prevPage()" :disabled="currentPage === 1 || loading"
+                    class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    data-touch-target>
+                    <i x-show="!loading" class="fas fa-chevron-left"></i>
+                    <i x-show="loading" class="fas fa-spinner fa-spin"></i>
+                </button>
+
+                <span class="px-4 py-2 text-sm">
+                    <span x-text="(currentPage - 1) * itemsPerPage + 1" class="font-semibold"></span> -
+                    <span x-text="Math.min(currentPage * itemsPerPage, totalParticipants)" class="font-semibold"></span>
+                </span>
+
+                <button @click="nextPage()" :disabled="!hasMore || loading"
+                    class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    data-touch-target>
+                    <i x-show="!loading" class="fas fa-chevron-right"></i>
+                    <i x-show="loading" class="fas fa-spinner fa-spin"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('participants', () => ({
+            participants: [],
+            orders: [],
+            groups: [],
+            filters: {
+                order_id: '',
+                paid: '',
+                search: '',
+                group_id: ''
+            },
+            currentPage: 1,
+            itemsPerPage: 20, // Reduced for mobile
+            totalParticipants: 0,
+            hasMore: false,
+            loading: true,
+
+            get filteredParticipants() {
+                let filtered = this.participants;
+
+                if (this.filters.order_id) {
+                    filtered = filtered.filter(p => p.order_id === this.filters.order_id);
+                }
+
+                if (this.filters.paid !== '') {
+                    const paid = this.filters.paid === 'true';
+                    filtered = filtered.filter(p => p.paid === paid);
+                }
+
+                if (this.filters.search) {
+                    const searchTerm = this.filters.search.toLowerCase();
+                    filtered = filtered.filter(p =>
+                        p.username.toLowerCase().includes(searchTerm) ||
+                        p.order_id.toLowerCase().includes(searchTerm)
+                    );
+                }
+
+                return filtered;
+            },
+
+            async init() {
+                await Promise.all([this.loadParticipants(), this.loadOrders(), this.loadGroups()]);
+                this.loading = false;
+            },
+
+            async loadParticipants() {
+                try {
+                    this.loading = true;
+                    const offset = (this.currentPage - 1) * this.itemsPerPage;
+
+                    let url = `/admin/api/participants?limit=${this.itemsPerPage}&offset=${offset}`;
+
+                    if (this.filters.order_id) {
+                        url += `&order_id=${encodeURIComponent(this.filters.order_id)}`;
+                    }
+
+                    if (this.filters.group_id) {
+                        url += `&group_id=${this.filters.group_id}`;
+                    }
+
+                    if (this.filters.paid !== '') {
+                        url += `&paid=${this.filters.paid}`;
+                    }
+
+                    if (this.filters.search) {
+                        url += `&search=${encodeURIComponent(this.filters.search)}`;
+                    }
+
+                    const response = await fetch(url);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    this.participants = data.participants || [];
+                    this.totalParticipants = data.total || 0;
+                    this.hasMore = data.has_more || false;
+
+                } catch (error) {
+                    console.error('Error loading participants:', error);
+                    this.participants = [];
+                    this.totalParticipants = 0;
+                    this.hasMore = false;
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async loadOrders() {
+                try {
+                    const response = await fetch('/admin/api/orders?limit=100');
+                    const data = await response.json();
+                    this.orders = data.orders || [];
+                } catch (error) {
+                    console.error('Error loading orders:', error);
+                    this.orders = [];
+                }
+            },
+
+            async loadGroups() {
+                try {
+                    const response = await fetch('/admin/api/groups');
+                    const data = await response.json();
+                    this.groups = data.groups || [];
+                } catch (error) {
+                    console.error('Error loading groups:', error);
+                    this.groups = [];
+                }
+            },
+
+            async togglePayment(participant) {
+                try {
+                    const response = await fetch(`/admin/api/participants/${participant.order_id}/${participant.username}/paid`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        participant.paid = !participant.paid;
+                    } else {
+                        this.showNotification('Ошибка: ' + (result.detail || 'Неизвестная ошибка'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Error toggling payment:', error);
+                    this.showNotification('Ошибка при изменении статуса оплаты', 'error');
+                }
+            },
+
+            applyFilters() {
+                // Фильтрация происходит автоматически через computed property
+            },
+
+            async sendReminder(participant) {
+                try {
+                    const message = `🔔 Напоминание о задолженности по заказу ${participant.order_id}. Пожалуйста, оплатите ваш заказ.`;
+
+                    const response = await fetch('/admin/api/broadcast/reminder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            usernames: [participant.username]
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Ошибка отправки напоминания');
+                    }
+
+                    this.showNotification(`Напоминание отправлено @${participant.username}`, 'success');
+
+                } catch (error) {
+                    console.error('Error sending reminder:', error);
+                    this.showNotification('Ошибка отправки напоминания', 'error');
+                }
+            },
+
+            exportParticipants() {
+                const csvContent = this.convertToCSV(this.filteredParticipants);
+                this.downloadCSV(csvContent, 'participants.csv');
+            },
+
+            broadcastUnpaid() {
+                window.location.href = '/admin/broadcast';
+            },
+
+            async prevPage() {
+                if (this.currentPage > 1) {
+                    this.loading = true;
+                    this.currentPage--;
+                    await this.loadParticipants();
+                }
+            },
+
+            async nextPage() {
+                if (this.hasMore) {
+                    this.loading = true;
+                    this.currentPage++;
+                    await this.loadParticipants();
+                }
+            },
+
+            convertToCSV(participants) {
+                const headers = ['Username', 'Order ID', 'Paid', 'Updated At'];
+                const rows = participants.map(p => [
+                    `@${p.username}`,
+                    p.order_id,
+                    p.paid ? 'Да' : 'Нет',
+                    this.formatDate(p.updated_at)
+                ]);
+
+                return [headers, ...rows].map(row => row.join(',')).join('\n');
+            },
+
+            downloadCSV(content, filename) {
+                const blob = new Blob([content], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return 'Неизвестно';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            },
+
+            showNotification(message, type = 'info') {
+                if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                    Alpine.$data.pageUtils.showNotification(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}

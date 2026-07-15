@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block page_title %}Администраторы{% endblock %}
+
+{% block content %}
+<div x-data="adminUsers()" class="space-y-4 lg:space-y-6">
+    <!-- Header -->
+    <div class="glass-effect rounded-2xl p-4 lg:p-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
+            <div>
+                <h1 class="text-lg lg:text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                    Администраторы
+                </h1>
+                <p class="text-gray-400 mt-1 text-sm lg:text-base">Управление доступом к панели администратора</p>
+            </div>
+            <a href="/admin/admin-users/new" class="btn-primary px-4 py-3 rounded-2xl font-medium text-sm lg:text-base text-center" data-touch-target>
+                <i class="fas fa-plus mr-2"></i>Добавить администратора
+            </a>
+        </div>
+    </div>
+
+    <!-- Admin Users List -->
+    <div class="glass-effect rounded-2xl p-4 lg:p-6">
+        <!-- Header -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0 mb-4 lg:mb-6">
+            <h2 class="text-lg lg:text-xl font-semibold">Список администраторов</h2>
+            <div class="text-sm text-gray-400">
+                Всего: <span x-text="users.length" class="font-semibold text-white"></span>
+            </div>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="lg:hidden space-y-3">
+            <template x-if="loading">
+                <div class="text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
+                    <p class="text-gray-400">Загрузка администраторов...</p>
+                </div>
+            </template>
+            
+            <template x-if="!loading && users.length === 0">
+                <div class="text-center py-8">
+                    <i class="fas fa-users text-2xl mb-2"></i>
+                    <p class="text-gray-400">Нет администраторов</p>
+                </div>
+            </template>
+            
+            <template x-for="user in users" :key="user.id">
+                <div class="bg-white/5 rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all duration-200">
+                    <!-- Header -->
+                    <div class="flex items-center space-x-3 mb-3">
+                        <template x-if="user.avatar_url">
+                            <img :src="user.avatar_url" :alt="user.username" class="w-10 h-10 rounded-full">
+                        </template>
+                        <template x-if="!user.avatar_url">
+                            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-white text-sm"></i>
+                            </div>
+                        </template>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium truncate" x-text="user.username"></p>
+                            <p class="text-sm text-gray-400 truncate" x-text="user.email || 'Email не указан'"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Details -->
+                    <div class="space-y-2 text-sm mb-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Роль:</span>
+                            <span x-text="getRoleDisplayName(user.role_name || user.role)" 
+                                  :class="(user.role_name || user.role) === 'Супер-администратор' ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : (user.role_name || user.role) === 'admin' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : (user.role_name || user.role) === 'manager' ? 'bg-gradient-to-r from-green-500 to-teal-500' : 'bg-gradient-to-r from-gray-500 to-gray-600'"
+                                  class="px-2 py-1 rounded-full text-xs font-medium text-white"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Статус:</span>
+                            <span x-text="user.is_active ? 'Активен' : 'Неактивен'" 
+                                  :class="user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                                  class="px-2 py-1 rounded-full text-xs font-medium"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Последний вход:</span>
+                            <span class="text-gray-400 text-xs" x-text="formatDate(user.last_login)"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex justify-center space-x-2 pt-3 border-t border-white/10">
+                        <a :href="`/admin/admin-users/${user.id}/edit`" 
+                           class="flex-1 p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-all duration-200 text-center"
+                           data-touch-target>
+                            <i class="fas fa-edit"></i>
+                            <span class="text-xs block mt-1">Редактировать</span>
+                        </a>
+                        <button @click="deleteUser(user)" 
+                                class="flex-1 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all duration-200 text-center"
+                                data-touch-target>
+                            <i class="fas fa-trash"></i>
+                            <span class="text-xs block mt-1">Удалить</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Пользователь</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Роль</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Статус</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Последний вход</th>
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-if="loading">
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-gray-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>Загрузка администраторов...</p>
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        <template x-if="!loading && users.length === 0">
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-gray-400">
+                                    <i class="fas fa-users text-4xl mb-2 opacity-50"></i>
+                                    <div>Нет администраторов</div>
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        <template x-for="user in users" :key="user.id">
+                            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center space-x-3">
+                                        <template x-if="user.avatar_url">
+                                            <img :src="user.avatar_url" :alt="user.username" class="w-10 h-10 rounded-full">
+                                        </template>
+                                        <template x-if="!user.avatar_url">
+                                            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                                <i class="fas fa-user text-white"></i>
+                                            </div>
+                                        </template>
+                                        <div>
+                                            <div class="font-medium" x-text="user.username"></div>
+                                            <div class="text-sm text-gray-400" x-text="user.email || 'Email не указан'"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4">
+                                    <span x-text="getRoleDisplayName(user.role_name || user.role)" 
+                                          :class="(user.role_name || user.role) === 'Супер-администратор' ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : (user.role_name || user.role) === 'admin' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : (user.role_name || user.role) === 'manager' ? 'bg-gradient-to-r from-green-500 to-teal-500' : 'bg-gradient-to-r from-gray-500 to-gray-600'"
+                                          class="px-3 py-1 rounded-full text-xs font-medium text-white"></span>
+                                </td>
+                                <td class="py-4 px-4">
+                                    <span x-text="user.is_active ? 'Активен' : 'Неактивен'" 
+                                          :class="user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                                          class="px-3 py-1 rounded-full text-xs font-medium"></span>
+                                </td>
+                                <td class="py-4 px-4 text-gray-300" x-text="formatDate(user.last_login)"></td>
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center space-x-2">
+                                        <a :href="`/admin/admin-users/${user.id}/edit`" class="text-blue-400 hover:text-blue-300 p-2 rounded-2xl hover:bg-white/5 transition-colors" data-touch-target>
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button @click="deleteUser(user)" class="text-red-400 hover:text-red-300 p-2 rounded-2xl hover:bg-white/5 transition-colors" data-touch-target>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('adminUsers', () => ({
+        users: [],
+        loading: true,
+        
+        async init() {
+            await this.loadUsers();
+        },
+        
+        async loadUsers() {
+            try {
+                const response = await fetch('/admin/api/admin/users');
+                if (!response.ok) throw new Error('Ошибка загрузки данных');
+                const data = await response.json();
+                this.users = data.users || [];
+            } catch (error) {
+                console.error('Ошибка загрузки администраторов:', error);
+                this.showNotification('Ошибка загрузки списка администраторов', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async deleteUser(user) {
+            if (!confirm(`Вы уверены, что хотите удалить администратора ${user.username}?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/api/admin/users/${user.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Ошибка удаления');
+                }
+                
+                const data = await response.json();
+                this.showNotification(data.message || 'Администратор удален', 'success');
+                await this.loadUsers();
+            } catch (error) {
+                console.error('Ошибка удаления администратора:', error);
+                this.showNotification(error.message, 'error');
+            }
+        },
+        
+        getRoleDisplayName(roleName) {
+            const roleNames = {
+                'Супер-администратор': 'Супер-админ',
+                'admin': 'Администратор',
+                'manager': 'Менеджер',
+                'viewer': 'Наблюдатель'
+            };
+            return roleNames[roleName] || roleName;
+        },
+        
+        formatDate(dateString) {
+            if (!dateString) return 'Никогда';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return 'Неизвестно';
+            }
+        },
+        
+        showNotification(message, type = 'info') {
+            if (window.Alpine && Alpine.$data && Alpine.$data.pageUtils) {
+                Alpine.$data.pageUtils.showNotification(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}
